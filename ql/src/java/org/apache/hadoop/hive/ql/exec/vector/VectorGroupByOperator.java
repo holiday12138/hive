@@ -29,7 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.type.DataTypePhysicalVariation;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -180,21 +180,25 @@ public class VectorGroupByOperator extends Operator<GroupByDesc>
 
       if (!groupingSetsPresent) {
         doProcessBatch(batch, false, null);
-        return;
+      } else {
+        // We drive the doProcessBatch logic with the same batch but different
+        // grouping set id and null variation.
+        // PERFORMANCE NOTE: We do not try to reuse columns and generate the KeyWrappers anew...
+
+        final int size = groupingSets.length;
+        for (int i = 0; i < size; i++) {
+
+          // NOTE: We are overwriting the constant vector value...
+          groupingSetsDummyVectorExpression.setLongValue(groupingSets[i]);
+          groupingSetsDummyVectorExpression.evaluate(batch);
+
+          doProcessBatch(batch, (i == 0), allGroupingSetsOverrideIsNulls[i]);
+        }
       }
 
-      // We drive the doProcessBatch logic with the same batch but different
-      // grouping set id and null variation.
-      // PERFORMANCE NOTE: We do not try to reuse columns and generate the KeyWrappers anew...
-
-      final int size = groupingSets.length;
-      for (int i = 0; i < size; i++) {
-
-        // NOTE: We are overwriting the constant vector value...
-        groupingSetsDummyVectorExpression.setLongValue(groupingSets[i]);
-        groupingSetsDummyVectorExpression.evaluate(batch);
-
-        doProcessBatch(batch, (i == 0), allGroupingSetsOverrideIsNulls[i]);
+      if (this instanceof ProcessingModeHashAggregate) {
+        // Check if we should turn into streaming mode
+        ((ProcessingModeHashAggregate)this).checkHashModeEfficiency();
       }
     }
 
@@ -443,9 +447,6 @@ public class VectorGroupByOperator extends Operator<GroupByDesc>
 
       sumBatchSize += batch.size;
       lastModeCheckRowCount += batch.size;
-
-      // Check if we should turn into streaming mode
-      checkHashModeEfficiency();
     }
 
     @Override
@@ -591,20 +592,23 @@ public class VectorGroupByOperator extends Operator<GroupByDesc>
 
     /**
      * Returns true if the memory threshold for the hash table was reached.
+     * WARN: Frequent flushing can reduce Op throughput
      */
     private boolean shouldFlush(VectorizedRowBatch batch) {
       if (batch.size == 0) {
         return false;
       }
-      //numEntriesSinceCheck is the number of entries added to the hash table
+      // numEntriesSinceCheck is the number of entries added to the hash table
       // since the last time we checked the average variable size
       if (numEntriesSinceCheck >= this.checkInterval) {
         // Were going to update the average variable row size by sampling the current batch
         updateAvgVariableSize(batch);
         numEntriesSinceCheck = 0;
       }
-      if (numEntriesHashTable > this.maxHtEntries ||
-          numEntriesHashTable * (fixedHashEntrySize + avgVariableSize) > maxHashTblMemory) {
+      long currMemUsed = numEntriesHashTable * (fixedHashEntrySize + avgVariableSize);
+      // Protect against low maxHtEntries setting: if memory usage is below 30% avoid flushing
+      if ( ((numEntriesHashTable > this.maxHtEntries) && (currMemUsed > 0.3 * maxHashTblMemory))  ||
+          currMemUsed > maxHashTblMemory) {
         return true;
       }
       if (gcCanary.get() == null) {
@@ -640,9 +644,26 @@ public class VectorGroupByOperator extends Operator<GroupByDesc>
           LOG.debug(String.format("checkHashModeEfficiency: HT:%d RC:%d MIN:%d",
               numEntriesHashTable, sumBatchSize, (long)(sumBatchSize * minReductionHashAggr)));
         }
-        if (numEntriesHashTable > sumBatchSize * minReductionHashAggr) {
+        /*
+         * The grouping sets expand the hash sizes by producing intermediate keys. 3 grouping sets
+         * of (),(col1),(col1,col2), will turn 10 rows into 30 rows. If the col1 has an nDV of 2 and
+         * col2 has nDV of 5, then this turns into a maximum of 1+3+(2*5) or 14 keys into the
+         * hashtable.
+         * 
+         * So you get 10 rows in and 14 rows out, which is a reduction of ~2x vs Streaming mode,
+         * but it is an increase if the grouping-set is not accounted for.
+         * 
+         * For performance, it is definitely better to send 14 rows out to shuffle and not 30.
+         * 
+         * Particularly if the same nDVs are repeated for a thousand rows, this would send a
+         * thousand rows via streaming to a single reducer which owns the empty grouping set,
+         * instead of sending 1 from the hash.
+         * 
+         */
+        final int groupingExpansion = (groupingSets != null) ? groupingSets.length : 1;
+        final long intermediateKeyCount = sumBatchSize * groupingExpansion;
+        if (numEntriesHashTable > intermediateKeyCount * minReductionHashAggr) {
           flush(true);
-
           changeToStreamingMode();
         }
       }
@@ -980,7 +1001,7 @@ public class VectorGroupByOperator extends Operator<GroupByDesc>
   protected void initializeOp(Configuration hconf) throws HiveException {
     super.initializeOp(hconf);
     isLlap = LlapProxy.isDaemon();
-    VectorExpression.doTransientInit(keyExpressions);
+    VectorExpression.doTransientInit(keyExpressions, hconf);
 
     List<ObjectInspector> objectInspectors = new ArrayList<ObjectInspector>();
 
@@ -1019,7 +1040,7 @@ public class VectorGroupByOperator extends Operator<GroupByDesc>
            throw new HiveException("Failed to create " + vecAggrClass.getSimpleName() +
                "(VectorAggregationDesc) object ", e);
         }
-        VectorExpression.doTransientInit(vecAggrExpr.getInputExpression());
+        VectorExpression.doTransientInit(vecAggrExpr.getInputExpression(), hconf);
         aggregators[i] = vecAggrExpr;
 
         ObjectInspector objInsp =

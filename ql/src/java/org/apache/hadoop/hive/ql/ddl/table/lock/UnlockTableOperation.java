@@ -27,17 +27,14 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 /**
  * Operation process of unlocking a table.
  */
-public class UnlockTableOperation extends DDLOperation {
-  private final UnlockTableDesc desc;
-
+public class UnlockTableOperation extends DDLOperation<UnlockTableDesc> {
   public UnlockTableOperation(DDLOperationContext context, UnlockTableDesc desc) {
-    super(context);
-    this.desc = desc;
+    super(context, desc);
   }
 
   @Override
   public int execute() throws HiveException {
-    Context ctx = context.getDriverContext().getCtx();
+    Context ctx = context.getContext();
     HiveTxnManager txnManager = ctx.getHiveTxnManager();
     return txnManager.unlockTable(context.getDb(), desc);
   }

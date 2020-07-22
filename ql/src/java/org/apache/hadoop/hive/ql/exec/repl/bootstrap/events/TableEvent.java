@@ -18,7 +18,7 @@
 package org.apache.hadoop.hive.ql.exec.repl.bootstrap.events;
 
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.ql.ddl.table.partition.AlterTableAddPartitionDesc;
+import org.apache.hadoop.hive.ql.ddl.table.partition.add.AlterTableAddPartitionDesc;
 import org.apache.hadoop.hive.ql.parse.ReplicationSpec;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.ImportTableDesc;
@@ -42,4 +42,6 @@ public interface TableEvent extends BootstrapEvent {
    * Exposing the FileSystem implementation outside which is what it should NOT do.
    */
   Path metadataPath();
+
+  Path dataPath();
 }

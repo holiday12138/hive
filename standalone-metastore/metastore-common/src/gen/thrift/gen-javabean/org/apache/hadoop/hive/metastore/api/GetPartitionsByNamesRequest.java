@@ -44,6 +44,8 @@ import org.slf4j.LoggerFactory;
   private static final org.apache.thrift.protocol.TField GET_COL_STATS_FIELD_DESC = new org.apache.thrift.protocol.TField("get_col_stats", org.apache.thrift.protocol.TType.BOOL, (short)4);
   private static final org.apache.thrift.protocol.TField PROCESSOR_CAPABILITIES_FIELD_DESC = new org.apache.thrift.protocol.TField("processorCapabilities", org.apache.thrift.protocol.TType.LIST, (short)5);
   private static final org.apache.thrift.protocol.TField PROCESSOR_IDENTIFIER_FIELD_DESC = new org.apache.thrift.protocol.TField("processorIdentifier", org.apache.thrift.protocol.TType.STRING, (short)6);
+  private static final org.apache.thrift.protocol.TField ENGINE_FIELD_DESC = new org.apache.thrift.protocol.TField("engine", org.apache.thrift.protocol.TType.STRING, (short)7);
+  private static final org.apache.thrift.protocol.TField VALID_WRITE_ID_LIST_FIELD_DESC = new org.apache.thrift.protocol.TField("validWriteIdList", org.apache.thrift.protocol.TType.STRING, (short)8);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -57,6 +59,8 @@ import org.slf4j.LoggerFactory;
   private boolean get_col_stats; // optional
   private List<String> processorCapabilities; // optional
   private String processorIdentifier; // optional
+  private String engine; // optional
+  private String validWriteIdList; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -65,7 +69,9 @@ import org.slf4j.LoggerFactory;
     NAMES((short)3, "names"),
     GET_COL_STATS((short)4, "get_col_stats"),
     PROCESSOR_CAPABILITIES((short)5, "processorCapabilities"),
-    PROCESSOR_IDENTIFIER((short)6, "processorIdentifier");
+    PROCESSOR_IDENTIFIER((short)6, "processorIdentifier"),
+    ENGINE((short)7, "engine"),
+    VALID_WRITE_ID_LIST((short)8, "validWriteIdList");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -92,6 +98,10 @@ import org.slf4j.LoggerFactory;
           return PROCESSOR_CAPABILITIES;
         case 6: // PROCESSOR_IDENTIFIER
           return PROCESSOR_IDENTIFIER;
+        case 7: // ENGINE
+          return ENGINE;
+        case 8: // VALID_WRITE_ID_LIST
+          return VALID_WRITE_ID_LIST;
         default:
           return null;
       }
@@ -134,7 +144,7 @@ import org.slf4j.LoggerFactory;
   // isset id assignments
   private static final int __GET_COL_STATS_ISSET_ID = 0;
   private byte __isset_bitfield = 0;
-  private static final _Fields optionals[] = {_Fields.NAMES,_Fields.GET_COL_STATS,_Fields.PROCESSOR_CAPABILITIES,_Fields.PROCESSOR_IDENTIFIER};
+  private static final _Fields optionals[] = {_Fields.NAMES,_Fields.GET_COL_STATS,_Fields.PROCESSOR_CAPABILITIES,_Fields.PROCESSOR_IDENTIFIER,_Fields.ENGINE,_Fields.VALID_WRITE_ID_LIST};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -151,6 +161,10 @@ import org.slf4j.LoggerFactory;
         new org.apache.thrift.meta_data.ListMetaData(org.apache.thrift.protocol.TType.LIST, 
             new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING))));
     tmpMap.put(_Fields.PROCESSOR_IDENTIFIER, new org.apache.thrift.meta_data.FieldMetaData("processorIdentifier", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.ENGINE, new org.apache.thrift.meta_data.FieldMetaData("engine", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.VALID_WRITE_ID_LIST, new org.apache.thrift.meta_data.FieldMetaData("validWriteIdList", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(GetPartitionsByNamesRequest.class, metaDataMap);
@@ -191,6 +205,12 @@ import org.slf4j.LoggerFactory;
     if (other.isSetProcessorIdentifier()) {
       this.processorIdentifier = other.processorIdentifier;
     }
+    if (other.isSetEngine()) {
+      this.engine = other.engine;
+    }
+    if (other.isSetValidWriteIdList()) {
+      this.validWriteIdList = other.validWriteIdList;
+    }
   }
 
   public GetPartitionsByNamesRequest deepCopy() {
@@ -206,6 +226,8 @@ import org.slf4j.LoggerFactory;
     this.get_col_stats = false;
     this.processorCapabilities = null;
     this.processorIdentifier = null;
+    this.engine = null;
+    this.validWriteIdList = null;
   }
 
   public String getDb_name() {
@@ -375,6 +397,52 @@ import org.slf4j.LoggerFactory;
     }
   }
 
+  public String getEngine() {
+    return this.engine;
+  }
+
+  public void setEngine(String engine) {
+    this.engine = engine;
+  }
+
+  public void unsetEngine() {
+    this.engine = null;
+  }
+
+  /** Returns true if field engine is set (has been assigned a value) and false otherwise */
+  public boolean isSetEngine() {
+    return this.engine != null;
+  }
+
+  public void setEngineIsSet(boolean value) {
+    if (!value) {
+      this.engine = null;
+    }
+  }
+
+  public String getValidWriteIdList() {
+    return this.validWriteIdList;
+  }
+
+  public void setValidWriteIdList(String validWriteIdList) {
+    this.validWriteIdList = validWriteIdList;
+  }
+
+  public void unsetValidWriteIdList() {
+    this.validWriteIdList = null;
+  }
+
+  /** Returns true if field validWriteIdList is set (has been assigned a value) and false otherwise */
+  public boolean isSetValidWriteIdList() {
+    return this.validWriteIdList != null;
+  }
+
+  public void setValidWriteIdListIsSet(boolean value) {
+    if (!value) {
+      this.validWriteIdList = null;
+    }
+  }
+
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
     case DB_NAME:
@@ -425,6 +493,22 @@ import org.slf4j.LoggerFactory;
       }
       break;
 
+    case ENGINE:
+      if (value == null) {
+        unsetEngine();
+      } else {
+        setEngine((String)value);
+      }
+      break;
+
+    case VALID_WRITE_ID_LIST:
+      if (value == null) {
+        unsetValidWriteIdList();
+      } else {
+        setValidWriteIdList((String)value);
+      }
+      break;
+
     }
   }
 
@@ -447,6 +531,12 @@ import org.slf4j.LoggerFactory;
 
     case PROCESSOR_IDENTIFIER:
       return getProcessorIdentifier();
+
+    case ENGINE:
+      return getEngine();
+
+    case VALID_WRITE_ID_LIST:
+      return getValidWriteIdList();
 
     }
     throw new IllegalStateException();
@@ -471,6 +561,10 @@ import org.slf4j.LoggerFactory;
       return isSetProcessorCapabilities();
     case PROCESSOR_IDENTIFIER:
       return isSetProcessorIdentifier();
+    case ENGINE:
+      return isSetEngine();
+    case VALID_WRITE_ID_LIST:
+      return isSetValidWriteIdList();
     }
     throw new IllegalStateException();
   }
@@ -542,6 +636,24 @@ import org.slf4j.LoggerFactory;
         return false;
     }
 
+    boolean this_present_engine = true && this.isSetEngine();
+    boolean that_present_engine = true && that.isSetEngine();
+    if (this_present_engine || that_present_engine) {
+      if (!(this_present_engine && that_present_engine))
+        return false;
+      if (!this.engine.equals(that.engine))
+        return false;
+    }
+
+    boolean this_present_validWriteIdList = true && this.isSetValidWriteIdList();
+    boolean that_present_validWriteIdList = true && that.isSetValidWriteIdList();
+    if (this_present_validWriteIdList || that_present_validWriteIdList) {
+      if (!(this_present_validWriteIdList && that_present_validWriteIdList))
+        return false;
+      if (!this.validWriteIdList.equals(that.validWriteIdList))
+        return false;
+    }
+
     return true;
   }
 
@@ -578,6 +690,16 @@ import org.slf4j.LoggerFactory;
     list.add(present_processorIdentifier);
     if (present_processorIdentifier)
       list.add(processorIdentifier);
+
+    boolean present_engine = true && (isSetEngine());
+    list.add(present_engine);
+    if (present_engine)
+      list.add(engine);
+
+    boolean present_validWriteIdList = true && (isSetValidWriteIdList());
+    list.add(present_validWriteIdList);
+    if (present_validWriteIdList)
+      list.add(validWriteIdList);
 
     return list.hashCode();
   }
@@ -646,6 +768,26 @@ import org.slf4j.LoggerFactory;
     }
     if (isSetProcessorIdentifier()) {
       lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.processorIdentifier, other.processorIdentifier);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = Boolean.valueOf(isSetEngine()).compareTo(other.isSetEngine());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetEngine()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.engine, other.engine);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = Boolean.valueOf(isSetValidWriteIdList()).compareTo(other.isSetValidWriteIdList());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetValidWriteIdList()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.validWriteIdList, other.validWriteIdList);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -721,6 +863,26 @@ import org.slf4j.LoggerFactory;
       }
       first = false;
     }
+    if (isSetEngine()) {
+      if (!first) sb.append(", ");
+      sb.append("engine:");
+      if (this.engine == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.engine);
+      }
+      first = false;
+    }
+    if (isSetValidWriteIdList()) {
+      if (!first) sb.append(", ");
+      sb.append("validWriteIdList:");
+      if (this.validWriteIdList == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.validWriteIdList);
+      }
+      first = false;
+    }
     sb.append(")");
     return sb.toString();
   }
@@ -793,13 +955,13 @@ import org.slf4j.LoggerFactory;
           case 3: // NAMES
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
-                org.apache.thrift.protocol.TList _list562 = iprot.readListBegin();
-                struct.names = new ArrayList<String>(_list562.size);
-                String _elem563;
-                for (int _i564 = 0; _i564 < _list562.size; ++_i564)
+                org.apache.thrift.protocol.TList _list586 = iprot.readListBegin();
+                struct.names = new ArrayList<String>(_list586.size);
+                String _elem587;
+                for (int _i588 = 0; _i588 < _list586.size; ++_i588)
                 {
-                  _elem563 = iprot.readString();
-                  struct.names.add(_elem563);
+                  _elem587 = iprot.readString();
+                  struct.names.add(_elem587);
                 }
                 iprot.readListEnd();
               }
@@ -819,13 +981,13 @@ import org.slf4j.LoggerFactory;
           case 5: // PROCESSOR_CAPABILITIES
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
-                org.apache.thrift.protocol.TList _list565 = iprot.readListBegin();
-                struct.processorCapabilities = new ArrayList<String>(_list565.size);
-                String _elem566;
-                for (int _i567 = 0; _i567 < _list565.size; ++_i567)
+                org.apache.thrift.protocol.TList _list589 = iprot.readListBegin();
+                struct.processorCapabilities = new ArrayList<String>(_list589.size);
+                String _elem590;
+                for (int _i591 = 0; _i591 < _list589.size; ++_i591)
                 {
-                  _elem566 = iprot.readString();
-                  struct.processorCapabilities.add(_elem566);
+                  _elem590 = iprot.readString();
+                  struct.processorCapabilities.add(_elem590);
                 }
                 iprot.readListEnd();
               }
@@ -838,6 +1000,22 @@ import org.slf4j.LoggerFactory;
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.processorIdentifier = iprot.readString();
               struct.setProcessorIdentifierIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
+          case 7: // ENGINE
+            if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
+              struct.engine = iprot.readString();
+              struct.setEngineIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
+          case 8: // VALID_WRITE_ID_LIST
+            if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
+              struct.validWriteIdList = iprot.readString();
+              struct.setValidWriteIdListIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
@@ -870,9 +1048,9 @@ import org.slf4j.LoggerFactory;
           oprot.writeFieldBegin(NAMES_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, struct.names.size()));
-            for (String _iter568 : struct.names)
+            for (String _iter592 : struct.names)
             {
-              oprot.writeString(_iter568);
+              oprot.writeString(_iter592);
             }
             oprot.writeListEnd();
           }
@@ -889,9 +1067,9 @@ import org.slf4j.LoggerFactory;
           oprot.writeFieldBegin(PROCESSOR_CAPABILITIES_FIELD_DESC);
           {
             oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, struct.processorCapabilities.size()));
-            for (String _iter569 : struct.processorCapabilities)
+            for (String _iter593 : struct.processorCapabilities)
             {
-              oprot.writeString(_iter569);
+              oprot.writeString(_iter593);
             }
             oprot.writeListEnd();
           }
@@ -902,6 +1080,20 @@ import org.slf4j.LoggerFactory;
         if (struct.isSetProcessorIdentifier()) {
           oprot.writeFieldBegin(PROCESSOR_IDENTIFIER_FIELD_DESC);
           oprot.writeString(struct.processorIdentifier);
+          oprot.writeFieldEnd();
+        }
+      }
+      if (struct.engine != null) {
+        if (struct.isSetEngine()) {
+          oprot.writeFieldBegin(ENGINE_FIELD_DESC);
+          oprot.writeString(struct.engine);
+          oprot.writeFieldEnd();
+        }
+      }
+      if (struct.validWriteIdList != null) {
+        if (struct.isSetValidWriteIdList()) {
+          oprot.writeFieldBegin(VALID_WRITE_ID_LIST_FIELD_DESC);
+          oprot.writeString(struct.validWriteIdList);
           oprot.writeFieldEnd();
         }
       }
@@ -937,13 +1129,19 @@ import org.slf4j.LoggerFactory;
       if (struct.isSetProcessorIdentifier()) {
         optionals.set(3);
       }
-      oprot.writeBitSet(optionals, 4);
+      if (struct.isSetEngine()) {
+        optionals.set(4);
+      }
+      if (struct.isSetValidWriteIdList()) {
+        optionals.set(5);
+      }
+      oprot.writeBitSet(optionals, 6);
       if (struct.isSetNames()) {
         {
           oprot.writeI32(struct.names.size());
-          for (String _iter570 : struct.names)
+          for (String _iter594 : struct.names)
           {
-            oprot.writeString(_iter570);
+            oprot.writeString(_iter594);
           }
         }
       }
@@ -953,14 +1151,20 @@ import org.slf4j.LoggerFactory;
       if (struct.isSetProcessorCapabilities()) {
         {
           oprot.writeI32(struct.processorCapabilities.size());
-          for (String _iter571 : struct.processorCapabilities)
+          for (String _iter595 : struct.processorCapabilities)
           {
-            oprot.writeString(_iter571);
+            oprot.writeString(_iter595);
           }
         }
       }
       if (struct.isSetProcessorIdentifier()) {
         oprot.writeString(struct.processorIdentifier);
+      }
+      if (struct.isSetEngine()) {
+        oprot.writeString(struct.engine);
+      }
+      if (struct.isSetValidWriteIdList()) {
+        oprot.writeString(struct.validWriteIdList);
       }
     }
 
@@ -971,16 +1175,16 @@ import org.slf4j.LoggerFactory;
       struct.setDb_nameIsSet(true);
       struct.tbl_name = iprot.readString();
       struct.setTbl_nameIsSet(true);
-      BitSet incoming = iprot.readBitSet(4);
+      BitSet incoming = iprot.readBitSet(6);
       if (incoming.get(0)) {
         {
-          org.apache.thrift.protocol.TList _list572 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
-          struct.names = new ArrayList<String>(_list572.size);
-          String _elem573;
-          for (int _i574 = 0; _i574 < _list572.size; ++_i574)
+          org.apache.thrift.protocol.TList _list596 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+          struct.names = new ArrayList<String>(_list596.size);
+          String _elem597;
+          for (int _i598 = 0; _i598 < _list596.size; ++_i598)
           {
-            _elem573 = iprot.readString();
-            struct.names.add(_elem573);
+            _elem597 = iprot.readString();
+            struct.names.add(_elem597);
           }
         }
         struct.setNamesIsSet(true);
@@ -991,13 +1195,13 @@ import org.slf4j.LoggerFactory;
       }
       if (incoming.get(2)) {
         {
-          org.apache.thrift.protocol.TList _list575 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
-          struct.processorCapabilities = new ArrayList<String>(_list575.size);
-          String _elem576;
-          for (int _i577 = 0; _i577 < _list575.size; ++_i577)
+          org.apache.thrift.protocol.TList _list599 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+          struct.processorCapabilities = new ArrayList<String>(_list599.size);
+          String _elem600;
+          for (int _i601 = 0; _i601 < _list599.size; ++_i601)
           {
-            _elem576 = iprot.readString();
-            struct.processorCapabilities.add(_elem576);
+            _elem600 = iprot.readString();
+            struct.processorCapabilities.add(_elem600);
           }
         }
         struct.setProcessorCapabilitiesIsSet(true);
@@ -1005,6 +1209,14 @@ import org.slf4j.LoggerFactory;
       if (incoming.get(3)) {
         struct.processorIdentifier = iprot.readString();
         struct.setProcessorIdentifierIsSet(true);
+      }
+      if (incoming.get(4)) {
+        struct.engine = iprot.readString();
+        struct.setEngineIsSet(true);
+      }
+      if (incoming.get(5)) {
+        struct.validWriteIdList = iprot.readString();
+        struct.setValidWriteIdListIsSet(true);
       }
     }
   }

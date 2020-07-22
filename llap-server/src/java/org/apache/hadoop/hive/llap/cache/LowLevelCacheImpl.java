@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hive.llap.cache;
 
-import org.apache.orc.impl.RecordReaderUtils;
-
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -29,19 +27,20 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hive.common.io.Allocator;
-import org.apache.hadoop.hive.common.io.DiskRange;
-import org.apache.hadoop.hive.common.io.DiskRangeList;
+import org.apache.hadoop.hive.common.io.CacheTag;
 import org.apache.hadoop.hive.common.io.DataCache.BooleanRef;
 import org.apache.hadoop.hive.common.io.DataCache.DiskRangeListFactory;
+import org.apache.hadoop.hive.common.io.DiskRange;
+import org.apache.hadoop.hive.common.io.DiskRangeList;
 import org.apache.hadoop.hive.common.io.DiskRangeList.MutateHelper;
 import org.apache.hadoop.hive.common.io.encoded.MemoryBuffer;
 import org.apache.hadoop.hive.llap.io.api.impl.LlapIoImpl;
 import org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheMetrics;
 import org.apache.hive.common.util.Ref;
+import org.apache.orc.impl.RecordReaderUtils;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
-import com.google.common.base.Joiner;
 
 public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, LlapIoDebugDump {
   private static final int DEFAULT_CLEANUP_INTERVAL = 600;
@@ -290,11 +289,11 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
 
   @Override
   public long[] putFileData(Object fileKey, DiskRange[] ranges, MemoryBuffer[] buffers,
-      long baseOffset, Priority priority, LowLevelCacheCounters qfCounters, String tag) {
+      long baseOffset, Priority priority, LowLevelCacheCounters qfCounters, CacheTag tag) {
     long[] result = null;
     assert buffers.length == ranges.length;
     FileCache<ConcurrentSkipListMap<Long, LlapDataBuffer>> subCache =
-        FileCache.getOrAddFileSubCache(cache, fileKey, CACHE_CTOR);
+        FileCache.getOrAddFileSubCache(cache, fileKey, CACHE_CTOR, tag);
     try {
       for (int i = 0; i < ranges.length; ++i) {
         LlapDataBuffer buffer = (LlapDataBuffer)buffers[i];
@@ -306,10 +305,10 @@ public class LowLevelCacheImpl implements LowLevelCache, BufferUsageManager, Lla
         long offset = ranges[i].getOffset() + baseOffset;
         assert buffer.declaredCachedLength == LlapDataBuffer.UNKNOWN_CACHED_LENGTH;
         buffer.declaredCachedLength = ranges[i].getLength();
-        buffer.setTag(tag);
         while (true) { // Overwhelmingly executes once, or maybe twice (replacing stale value).
           LlapDataBuffer oldVal = subCache.getCache().putIfAbsent(offset, buffer);
           if (oldVal == null) {
+            buffer.setFileCache(subCache);
             // Cached successfully, add to policy.
             cachePolicy.cache(buffer, priority);
             if (qfCounters != null) {

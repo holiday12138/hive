@@ -32,7 +32,7 @@ import org.apache.hadoop.hive.ql.QTestArguments;
 import org.apache.hadoop.hive.ql.QTestProcessExecResult;
 import org.apache.hadoop.hive.ql.QTestUtil;
 import org.apache.hadoop.hive.ql.QTestMiniClusters.MiniClusterType;
-import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
+import org.apache.hadoop.hive.ql.processors.CommandProcessorException;
 import org.apache.hive.testutils.HiveTestEnvSetup;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -78,9 +78,6 @@ public abstract class AbstractCoreBlobstoreCliDriver extends CliAdapter {
 
       // do a one time initialization
       setupUniqueTestPath();
-      qt.newSession();
-      qt.cleanUp();
-      qt.createSources();
 
     } catch (Exception e) {
       System.err.println("Exception: " + e.getMessage());
@@ -125,8 +122,7 @@ public abstract class AbstractCoreBlobstoreCliDriver extends CliAdapter {
     try {
       qt.shutdown();
       if (System.getenv(QTestUtil.QTEST_LEAVE_FILES) == null) {
-        String rmUniquePathCommand = String.format("dfs -rmdir ${hiveconf:%s};", HCONF_TEST_BLOBSTORE_PATH_UNIQUE);
-        qt.executeAdhocCommand(rmUniquePathCommand);
+        qt.executeAdhocCommand("dfs -rmdir " + testBlobstorePathUnique);
       }
     } catch (Exception e) {
       System.err.println("Exception: " + e.getMessage());
@@ -134,6 +130,11 @@ public abstract class AbstractCoreBlobstoreCliDriver extends CliAdapter {
       System.err.flush();
       fail("Unexpected exception in shutdown");
     }
+  }
+
+  @Override
+  protected QTestUtil getQt() {
+    return qt;
   }
 
   private static String debugHint = "\nSee ./itests/hive-blobstore/target/tmp/log/hive.log, "
@@ -148,9 +149,15 @@ public abstract class AbstractCoreBlobstoreCliDriver extends CliAdapter {
       qt.addFile(fpath);
       qt.cliInit(new File(fpath));
 
-      CommandProcessorResponse response = qt.executeClient(fname);
-      if ((response.getResponseCode() == 0) ^ expectSuccess) {
-        qt.failedQuery(response.getException(), response.getResponseCode(), fname, debugHint);
+      try {
+        qt.executeClient(fname);
+        if (!expectSuccess) {
+          qt.failedQuery(null, 0, fname, debugHint);
+        }
+      } catch (CommandProcessorException e) {
+        if (expectSuccess) {
+          qt.failedQuery(e.getCause(), e.getResponseCode(), fname, debugHint);
+        }
       }
 
       QTestProcessExecResult result = qt.checkCliDriverResults(fname);

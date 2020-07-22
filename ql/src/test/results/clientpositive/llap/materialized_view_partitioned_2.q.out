@@ -25,6 +25,7 @@ POSTHOOK: type: CREATE_MATERIALIZED_VIEW
 POSTHOOK: Input: default@src_txn_2
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@partition_mv_1
+POSTHOOK: Output: default@partition_mv_1
 POSTHOOK: Output: default@partition_mv_1@key=201
 POSTHOOK: Output: default@partition_mv_1@key=202
 POSTHOOK: Output: default@partition_mv_1@key=203
@@ -161,6 +162,7 @@ SELECT key, value FROM src_txn_2
 POSTHOOK: type: CREATE_MATERIALIZED_VIEW
 POSTHOOK: Input: default@src_txn_2
 POSTHOOK: Output: database:default
+POSTHOOK: Output: default@partition_mv_2
 POSTHOOK: Output: default@partition_mv_2
 POSTHOOK: Output: default@partition_mv_2@value=val_201
 POSTHOOK: Output: default@partition_mv_2@value=val_202
@@ -299,6 +301,7 @@ POSTHOOK: type: CREATE_MATERIALIZED_VIEW
 POSTHOOK: Input: default@src_txn_2
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@partition_mv_3
+POSTHOOK: Output: default@partition_mv_3
 POSTHOOK: Output: default@partition_mv_3@key=221
 POSTHOOK: Output: default@partition_mv_3@key=222
 POSTHOOK: Output: default@partition_mv_3@key=223
@@ -325,6 +328,7 @@ SELECT value, key FROM src_txn_2 where key > 222 and key < 228
 POSTHOOK: type: CREATE_MATERIALIZED_VIEW
 POSTHOOK: Input: default@src_txn_2
 POSTHOOK: Output: database:default
+POSTHOOK: Output: default@partition_mv_4
 POSTHOOK: Output: default@partition_mv_4
 POSTHOOK: Output: default@partition_mv_4@key=223
 POSTHOOK: Output: default@partition_mv_4@key=224
@@ -382,7 +386,7 @@ STAGE PLANS:
           alias: default.partition_mv_1
           filterExpr: ((UDFToDouble(key) > 210.0D) and (UDFToDouble(key) < 230.0D)) (type: boolean)
           Filter Operator
-            predicate: ((UDFToDouble(key) < 230.0D) and (UDFToDouble(key) > 210.0D)) (type: boolean)
+            predicate: ((UDFToDouble(key) > 210.0D) and (UDFToDouble(key) < 230.0D)) (type: boolean)
             Select Operator
               expressions: key (type: string), value (type: string)
               outputColumnNames: _col0, _col1
@@ -525,13 +529,13 @@ POSTHOOK: Input: default@src_txn_2
 PREHOOK: query: EXPLAIN
 SELECT * FROM src_txn_2 where key > 224 and key < 226
 PREHOOK: type: QUERY
-PREHOOK: Input: default@partition_mv_4
+PREHOOK: Input: default@partition_mv_1
 PREHOOK: Input: default@src_txn_2
 #### A masked pattern was here ####
 POSTHOOK: query: EXPLAIN
 SELECT * FROM src_txn_2 where key > 224 and key < 226
 POSTHOOK: type: QUERY
-POSTHOOK: Input: default@partition_mv_4
+POSTHOOK: Input: default@partition_mv_1
 POSTHOOK: Input: default@src_txn_2
 #### A masked pattern was here ####
 STAGE DEPENDENCIES:
@@ -543,10 +547,10 @@ STAGE PLANS:
       limit: -1
       Processor Tree:
         TableScan
-          alias: default.partition_mv_4
+          alias: default.partition_mv_1
           filterExpr: ((UDFToDouble(key) > 224.0D) and (UDFToDouble(key) < 226.0D)) (type: boolean)
           Filter Operator
-            predicate: ((UDFToDouble(key) < 226.0D) and (UDFToDouble(key) > 224.0D)) (type: boolean)
+            predicate: ((UDFToDouble(key) > 224.0D) and (UDFToDouble(key) < 226.0D)) (type: boolean)
             Select Operator
               expressions: key (type: string), value (type: string)
               outputColumnNames: _col0, _col1
@@ -554,14 +558,14 @@ STAGE PLANS:
 
 PREHOOK: query: SELECT * FROM src_txn_2 where key > 223 and key < 225
 PREHOOK: type: QUERY
-PREHOOK: Input: default@partition_mv_4
-PREHOOK: Input: default@partition_mv_4@key=224
+PREHOOK: Input: default@partition_mv_1
+PREHOOK: Input: default@partition_mv_1@key=224
 PREHOOK: Input: default@src_txn_2
 #### A masked pattern was here ####
 POSTHOOK: query: SELECT * FROM src_txn_2 where key > 223 and key < 225
 POSTHOOK: type: QUERY
-POSTHOOK: Input: default@partition_mv_4
-POSTHOOK: Input: default@partition_mv_4@key=224
+POSTHOOK: Input: default@partition_mv_1
+POSTHOOK: Input: default@partition_mv_1@key=224
 POSTHOOK: Input: default@src_txn_2
 #### A masked pattern was here ####
 224	val_224

@@ -37,11 +37,11 @@ import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DatumWriter;
 import org.apache.avro.io.EncoderFactory;
 import org.apache.avro.specific.SpecificDatumWriter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hbase.zookeeper.MiniZooKeeperCluster;
 import org.apache.hadoop.hive.cli.CliSessionState;
 import org.apache.hadoop.hive.cli.control.AbstractCliConfig;
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -62,7 +62,7 @@ import org.apache.hadoop.hive.shims.HadoopShims.HdfsErasureCodingShim;
 import org.apache.hive.druid.MiniDruidCluster;
 import org.apache.hive.kafka.SingleNodeKafkaCluster;
 import org.apache.hive.kafka.Wikipedia;
-import org.apache.logging.log4j.util.Strings;
+import org.apache.hive.testutils.MiniZooKeeperCluster;
 import org.apache.zookeeper.WatchedEvent;
 import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
@@ -120,7 +120,8 @@ public class QTestMiniClusters {
     DRUID_LOCAL(CoreClusterType.TEZ, FsType.LOCAL),
     DRUID(CoreClusterType.TEZ, FsType.HDFS),
     DRUID_KAFKA(CoreClusterType.TEZ, FsType.HDFS),
-    KAFKA(CoreClusterType.TEZ, FsType.HDFS);
+    KAFKA(CoreClusterType.TEZ, FsType.HDFS),
+    KUDU(CoreClusterType.TEZ, FsType.LOCAL);
 
     private final CoreClusterType coreClusterType;
     private final FsType defaultFsType;
@@ -162,6 +163,8 @@ public class QTestMiniClusters {
         return DRUID_KAFKA;
       } else if (type.equals("kafka")) {
         return KAFKA;
+      } else if (type.equals("kudu")) {
+        return KUDU;
       } else {
         throw new RuntimeException(String.format("cannot recognize MiniClusterType from '%s'", type));
       }
@@ -580,7 +583,7 @@ public class QTestMiniClusters {
     Path userInstallPath;
     if (isLocalFs) {
       String buildDir = QTestSystemProperties.getBuildDir();
-      Preconditions.checkState(Strings.isNotBlank(buildDir));
+      Preconditions.checkState(StringUtils.isNotBlank(buildDir));
       Path path = new Path(fsUriString, buildDir);
 
       // Create a fake fs root for local fs

@@ -27,6 +27,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.CompilationOpContext;
+import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.DynamicPartitionCtx;
 import org.apache.hadoop.hive.ql.plan.FileMergeDesc;
@@ -110,14 +111,16 @@ public abstract class AbstractFileMergeOperator<T extends FileMergeDesc>
 
   // sets up temp and task temp path
   private void updatePaths(Path tp, Path ttp) {
-    if (taskId == null) {
-      taskId = Utilities.getTaskId(jc);
-    }
+    taskId = Utilities.getTaskId(jc);
     tmpPath = tp;
     if (isMmTable) {
       taskTmpPath = null;
       // Make sure we don't collide with the source.
       outPath = finalPath = new Path(tmpPath, taskId + ".merged");
+    } else if (conf.getIsCompactionTable()) {
+      taskTmpPath = ttp; // _task_tmp
+      finalPath = tp; // _tmp
+      outPath = ttp; // also _task_tmp
     } else {
       taskTmpPath = ttp;
       finalPath = new Path(tp, taskId);
@@ -259,8 +262,8 @@ public abstract class AbstractFileMergeOperator<T extends FileMergeDesc>
           assert finalPath.equals(outPath);
           // There's always just one file that we have merged.
           // The union/DP/etc. should already be account for in the path.
-          Utilities.writeMmCommitManifest(Lists.newArrayList(outPath),
-              tmpPath.getParent(), fs, taskId, conf.getWriteId(), conf.getStmtId(), null, false);
+          Utilities.writeCommitManifest(Lists.newArrayList(outPath), tmpPath.getParent(), fs, taskId, conf.getWriteId(),
+              conf.getStmtId(), null, false, hasDynamicPartitions, new HashSet<>(), null);
           LOG.info("Merged into " + finalPath + "(" + fss.getLen() + " bytes).");
         }
       }
@@ -339,8 +342,8 @@ public abstract class AbstractFileMergeOperator<T extends FileMergeDesc>
             lbLevels = conf.getListBucketingDepth();
         // We don't expect missing buckets from mere (actually there should be no buckets),
         // so just pass null as bucketing context. Union suffix should also be accounted for.
-        Utilities.handleMmTableFinalPath(outputDir.getParent(), null, hconf, success,
-            dpLevels, lbLevels, null, mmWriteId, stmtId, reporter, isMmTable, false, false);
+        Utilities.handleDirectInsertTableFinalPath(outputDir.getParent(), null, hconf, success, dpLevels, lbLevels,
+            null, mmWriteId, stmtId, reporter, isMmTable, false, false, false, null);
       }
 
     } catch (IOException e) {
@@ -373,6 +376,12 @@ public abstract class AbstractFileMergeOperator<T extends FileMergeDesc>
 
   protected final Path getOutPath() {
     return outPath;
+  }
+
+  protected final Path getOutPath(int bucketId) {
+    String fileName = AcidUtils.BUCKET_PREFIX + String.format(AcidUtils.BUCKET_DIGITS, bucketId);
+    Path out = new Path(outPath, fileName);
+    return out;
   }
 
   protected final void addIncompatibleFile(Path path) {

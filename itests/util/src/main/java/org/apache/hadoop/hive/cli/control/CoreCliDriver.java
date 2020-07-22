@@ -29,12 +29,13 @@ import org.apache.hadoop.hive.ql.QTestArguments;
 import org.apache.hadoop.hive.ql.QTestProcessExecResult;
 import org.apache.hadoop.hive.ql.QTestUtil;
 import org.apache.hadoop.hive.ql.QTestMiniClusters.MiniClusterType;
-import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
+import org.apache.hadoop.hive.ql.processors.CommandProcessorException;
 import org.apache.hadoop.hive.util.ElapsedTimeLoggingWrapper;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.internal.AssumptionViolatedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +58,7 @@ public class CoreCliDriver extends CliAdapter {
     LOG.info(message);
     System.err.println(message);
 
-    MiniClusterType miniMR =cliConfig.getClusterType();
+    MiniClusterType miniMR = cliConfig.getClusterType();
     String hiveConfDir = cliConfig.getHiveConfDir();
     String initScript = cliConfig.getInitScript();
     String cleanupScript = cliConfig.getCleanupScript();
@@ -79,25 +80,6 @@ public class CoreCliDriver extends CliAdapter {
                 .build());
         }
       }.invoke("QtestUtil instance created", LOG, true);
-
-      // do a one time initialization
-      new ElapsedTimeLoggingWrapper<Void>() {
-        @Override
-        public Void invokeInternal() throws Exception {
-          qt.newSession();
-          qt.cleanUp(); // I don't think this is neccessary...
-          return null;
-        }
-      }.invoke("Initialization cleanup done.", LOG, true);
-
-      new ElapsedTimeLoggingWrapper<Void>() {
-        @Override
-        public Void invokeInternal() throws Exception {
-          qt.createSources();
-          return null;
-        }
-      }.invoke("Initialization createSources done.", LOG, true);
-
     } catch (Exception e) {
       System.err.println("Exception: " + e.getMessage());
       e.printStackTrace();
@@ -168,6 +150,11 @@ public class CoreCliDriver extends CliAdapter {
   }
 
   @Override
+  protected QTestUtil getQt() {
+    return qt;
+  }
+
+  @Override
   public void runTest(String testName, String fname, String fpath) {
     Stopwatch sw = Stopwatch.createStarted();
     boolean skipped = false;
@@ -179,11 +166,11 @@ public class CoreCliDriver extends CliAdapter {
       qt.addFile(fpath);
       qt.cliInit(new File(fpath));
 
-      CommandProcessorResponse response = qt.executeClient(fname);
-      int ecode = response.getResponseCode();
-      if (ecode != 0) {
+      try {
+        qt.executeClient(fname);
+      } catch (CommandProcessorException e) {
         failed = true;
-        qt.failedQuery(response.getException(), response.getResponseCode(), fname, QTestUtil.DEBUG_HINT);
+        qt.failedQuery(e.getCause(), e.getResponseCode(), fname, QTestUtil.DEBUG_HINT);
       }
 
       setupAdditionalPartialMasks();
@@ -195,8 +182,10 @@ public class CoreCliDriver extends CliAdapter {
             : "\r\n" + result.getCapturedOutput();
         qt.failedDiff(result.getReturnCode(), fname, message);
       }
-    }
-    catch (Exception e) {
+    } catch (AssumptionViolatedException e) {
+      skipped = true;
+      throw e;
+    } catch (Exception e) {
       failed = true;
       qt.failedWithException(e, fname, QTestUtil.DEBUG_HINT);
     } finally {

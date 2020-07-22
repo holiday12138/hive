@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -681,7 +681,7 @@ class FileOutputCommitterContainer extends OutputCommitterContainer {
 
       // construct a path pattern (e.g., /*/*) to find all dynamically generated paths
       String dynPathSpec = loadPath.toUri().getPath();
-      dynPathSpec = dynPathSpec.replaceAll("__HIVE_DEFAULT_PARTITION__", "*");
+      dynPathSpec = dynPathSpec.replace("__HIVE_DEFAULT_PARTITION__", "*");
 
       //      LOG.info("Searching for "+dynPathSpec);
       Path pathPattern = new Path(dynPathSpec);

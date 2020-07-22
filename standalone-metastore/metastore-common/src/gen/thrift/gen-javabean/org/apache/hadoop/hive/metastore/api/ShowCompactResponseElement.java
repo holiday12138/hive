@@ -51,6 +51,8 @@ import org.slf4j.LoggerFactory;
   private static final org.apache.thrift.protocol.TField END_TIME_FIELD_DESC = new org.apache.thrift.protocol.TField("endTime", org.apache.thrift.protocol.TType.I64, (short)11);
   private static final org.apache.thrift.protocol.TField HADOOP_JOB_ID_FIELD_DESC = new org.apache.thrift.protocol.TField("hadoopJobId", org.apache.thrift.protocol.TType.STRING, (short)12);
   private static final org.apache.thrift.protocol.TField ID_FIELD_DESC = new org.apache.thrift.protocol.TField("id", org.apache.thrift.protocol.TType.I64, (short)13);
+  private static final org.apache.thrift.protocol.TField ERROR_MESSAGE_FIELD_DESC = new org.apache.thrift.protocol.TField("errorMessage", org.apache.thrift.protocol.TType.STRING, (short)14);
+  private static final org.apache.thrift.protocol.TField ENQUEUE_TIME_FIELD_DESC = new org.apache.thrift.protocol.TField("enqueueTime", org.apache.thrift.protocol.TType.I64, (short)15);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -71,6 +73,8 @@ import org.slf4j.LoggerFactory;
   private long endTime; // optional
   private String hadoopJobId; // optional
   private long id; // optional
+  private String errorMessage; // optional
+  private long enqueueTime; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -90,7 +94,9 @@ import org.slf4j.LoggerFactory;
     META_INFO((short)10, "metaInfo"),
     END_TIME((short)11, "endTime"),
     HADOOP_JOB_ID((short)12, "hadoopJobId"),
-    ID((short)13, "id");
+    ID((short)13, "id"),
+    ERROR_MESSAGE((short)14, "errorMessage"),
+    ENQUEUE_TIME((short)15, "enqueueTime");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -131,6 +137,10 @@ import org.slf4j.LoggerFactory;
           return HADOOP_JOB_ID;
         case 13: // ID
           return ID;
+        case 14: // ERROR_MESSAGE
+          return ERROR_MESSAGE;
+        case 15: // ENQUEUE_TIME
+          return ENQUEUE_TIME;
         default:
           return null;
       }
@@ -175,8 +185,9 @@ import org.slf4j.LoggerFactory;
   private static final int __HIGHTESTTXNID_ISSET_ID = 1;
   private static final int __ENDTIME_ISSET_ID = 2;
   private static final int __ID_ISSET_ID = 3;
+  private static final int __ENQUEUETIME_ISSET_ID = 4;
   private byte __isset_bitfield = 0;
-  private static final _Fields optionals[] = {_Fields.PARTITIONNAME,_Fields.WORKERID,_Fields.START,_Fields.RUN_AS,_Fields.HIGHTEST_TXN_ID,_Fields.META_INFO,_Fields.END_TIME,_Fields.HADOOP_JOB_ID,_Fields.ID};
+  private static final _Fields optionals[] = {_Fields.PARTITIONNAME,_Fields.WORKERID,_Fields.START,_Fields.RUN_AS,_Fields.HIGHTEST_TXN_ID,_Fields.META_INFO,_Fields.END_TIME,_Fields.HADOOP_JOB_ID,_Fields.ID,_Fields.ERROR_MESSAGE,_Fields.ENQUEUE_TIME};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -205,6 +216,10 @@ import org.slf4j.LoggerFactory;
     tmpMap.put(_Fields.HADOOP_JOB_ID, new org.apache.thrift.meta_data.FieldMetaData("hadoopJobId", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.ID, new org.apache.thrift.meta_data.FieldMetaData("id", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
+    tmpMap.put(_Fields.ERROR_MESSAGE, new org.apache.thrift.meta_data.FieldMetaData("errorMessage", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.ENQUEUE_TIME, new org.apache.thrift.meta_data.FieldMetaData("enqueueTime", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(ShowCompactResponseElement.class, metaDataMap);
@@ -264,6 +279,10 @@ import org.slf4j.LoggerFactory;
       this.hadoopJobId = other.hadoopJobId;
     }
     this.id = other.id;
+    if (other.isSetErrorMessage()) {
+      this.errorMessage = other.errorMessage;
+    }
+    this.enqueueTime = other.enqueueTime;
   }
 
   public ShowCompactResponseElement deepCopy() {
@@ -290,6 +309,9 @@ import org.slf4j.LoggerFactory;
 
     setIdIsSet(false);
     this.id = 0;
+    this.errorMessage = null;
+    setEnqueueTimeIsSet(false);
+    this.enqueueTime = 0;
   }
 
   public String getDbname() {
@@ -595,6 +617,51 @@ import org.slf4j.LoggerFactory;
     __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __ID_ISSET_ID, value);
   }
 
+  public String getErrorMessage() {
+    return this.errorMessage;
+  }
+
+  public void setErrorMessage(String errorMessage) {
+    this.errorMessage = errorMessage;
+  }
+
+  public void unsetErrorMessage() {
+    this.errorMessage = null;
+  }
+
+  /** Returns true if field errorMessage is set (has been assigned a value) and false otherwise */
+  public boolean isSetErrorMessage() {
+    return this.errorMessage != null;
+  }
+
+  public void setErrorMessageIsSet(boolean value) {
+    if (!value) {
+      this.errorMessage = null;
+    }
+  }
+
+  public long getEnqueueTime() {
+    return this.enqueueTime;
+  }
+
+  public void setEnqueueTime(long enqueueTime) {
+    this.enqueueTime = enqueueTime;
+    setEnqueueTimeIsSet(true);
+  }
+
+  public void unsetEnqueueTime() {
+    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __ENQUEUETIME_ISSET_ID);
+  }
+
+  /** Returns true if field enqueueTime is set (has been assigned a value) and false otherwise */
+  public boolean isSetEnqueueTime() {
+    return EncodingUtils.testBit(__isset_bitfield, __ENQUEUETIME_ISSET_ID);
+  }
+
+  public void setEnqueueTimeIsSet(boolean value) {
+    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __ENQUEUETIME_ISSET_ID, value);
+  }
+
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
     case DBNAME:
@@ -701,6 +768,22 @@ import org.slf4j.LoggerFactory;
       }
       break;
 
+    case ERROR_MESSAGE:
+      if (value == null) {
+        unsetErrorMessage();
+      } else {
+        setErrorMessage((String)value);
+      }
+      break;
+
+    case ENQUEUE_TIME:
+      if (value == null) {
+        unsetEnqueueTime();
+      } else {
+        setEnqueueTime((Long)value);
+      }
+      break;
+
     }
   }
 
@@ -745,6 +828,12 @@ import org.slf4j.LoggerFactory;
     case ID:
       return getId();
 
+    case ERROR_MESSAGE:
+      return getErrorMessage();
+
+    case ENQUEUE_TIME:
+      return getEnqueueTime();
+
     }
     throw new IllegalStateException();
   }
@@ -782,6 +871,10 @@ import org.slf4j.LoggerFactory;
       return isSetHadoopJobId();
     case ID:
       return isSetId();
+    case ERROR_MESSAGE:
+      return isSetErrorMessage();
+    case ENQUEUE_TIME:
+      return isSetEnqueueTime();
     }
     throw new IllegalStateException();
   }
@@ -916,6 +1009,24 @@ import org.slf4j.LoggerFactory;
         return false;
     }
 
+    boolean this_present_errorMessage = true && this.isSetErrorMessage();
+    boolean that_present_errorMessage = true && that.isSetErrorMessage();
+    if (this_present_errorMessage || that_present_errorMessage) {
+      if (!(this_present_errorMessage && that_present_errorMessage))
+        return false;
+      if (!this.errorMessage.equals(that.errorMessage))
+        return false;
+    }
+
+    boolean this_present_enqueueTime = true && this.isSetEnqueueTime();
+    boolean that_present_enqueueTime = true && that.isSetEnqueueTime();
+    if (this_present_enqueueTime || that_present_enqueueTime) {
+      if (!(this_present_enqueueTime && that_present_enqueueTime))
+        return false;
+      if (this.enqueueTime != that.enqueueTime)
+        return false;
+    }
+
     return true;
   }
 
@@ -987,6 +1098,16 @@ import org.slf4j.LoggerFactory;
     list.add(present_id);
     if (present_id)
       list.add(id);
+
+    boolean present_errorMessage = true && (isSetErrorMessage());
+    list.add(present_errorMessage);
+    if (present_errorMessage)
+      list.add(errorMessage);
+
+    boolean present_enqueueTime = true && (isSetEnqueueTime());
+    list.add(present_enqueueTime);
+    if (present_enqueueTime)
+      list.add(enqueueTime);
 
     return list.hashCode();
   }
@@ -1129,6 +1250,26 @@ import org.slf4j.LoggerFactory;
         return lastComparison;
       }
     }
+    lastComparison = Boolean.valueOf(isSetErrorMessage()).compareTo(other.isSetErrorMessage());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetErrorMessage()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.errorMessage, other.errorMessage);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = Boolean.valueOf(isSetEnqueueTime()).compareTo(other.isSetEnqueueTime());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetEnqueueTime()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.enqueueTime, other.enqueueTime);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
     return 0;
   }
 
@@ -1252,6 +1393,22 @@ import org.slf4j.LoggerFactory;
       if (!first) sb.append(", ");
       sb.append("id:");
       sb.append(this.id);
+      first = false;
+    }
+    if (isSetErrorMessage()) {
+      if (!first) sb.append(", ");
+      sb.append("errorMessage:");
+      if (this.errorMessage == null) {
+        sb.append("null");
+      } else {
+        sb.append(this.errorMessage);
+      }
+      first = false;
+    }
+    if (isSetEnqueueTime()) {
+      if (!first) sb.append(", ");
+      sb.append("enqueueTime:");
+      sb.append(this.enqueueTime);
       first = false;
     }
     sb.append(")");
@@ -1419,6 +1576,22 @@ import org.slf4j.LoggerFactory;
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
             break;
+          case 14: // ERROR_MESSAGE
+            if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
+              struct.errorMessage = iprot.readString();
+              struct.setErrorMessageIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
+          case 15: // ENQUEUE_TIME
+            if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
+              struct.enqueueTime = iprot.readI64();
+              struct.setEnqueueTimeIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
           default:
             org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
         }
@@ -1507,6 +1680,18 @@ import org.slf4j.LoggerFactory;
         oprot.writeI64(struct.id);
         oprot.writeFieldEnd();
       }
+      if (struct.errorMessage != null) {
+        if (struct.isSetErrorMessage()) {
+          oprot.writeFieldBegin(ERROR_MESSAGE_FIELD_DESC);
+          oprot.writeString(struct.errorMessage);
+          oprot.writeFieldEnd();
+        }
+      }
+      if (struct.isSetEnqueueTime()) {
+        oprot.writeFieldBegin(ENQUEUE_TIME_FIELD_DESC);
+        oprot.writeI64(struct.enqueueTime);
+        oprot.writeFieldEnd();
+      }
       oprot.writeFieldStop();
       oprot.writeStructEnd();
     }
@@ -1556,7 +1741,13 @@ import org.slf4j.LoggerFactory;
       if (struct.isSetId()) {
         optionals.set(8);
       }
-      oprot.writeBitSet(optionals, 9);
+      if (struct.isSetErrorMessage()) {
+        optionals.set(9);
+      }
+      if (struct.isSetEnqueueTime()) {
+        optionals.set(10);
+      }
+      oprot.writeBitSet(optionals, 11);
       if (struct.isSetPartitionname()) {
         oprot.writeString(struct.partitionname);
       }
@@ -1584,6 +1775,12 @@ import org.slf4j.LoggerFactory;
       if (struct.isSetId()) {
         oprot.writeI64(struct.id);
       }
+      if (struct.isSetErrorMessage()) {
+        oprot.writeString(struct.errorMessage);
+      }
+      if (struct.isSetEnqueueTime()) {
+        oprot.writeI64(struct.enqueueTime);
+      }
     }
 
     @Override
@@ -1597,7 +1794,7 @@ import org.slf4j.LoggerFactory;
       struct.setTypeIsSet(true);
       struct.state = iprot.readString();
       struct.setStateIsSet(true);
-      BitSet incoming = iprot.readBitSet(9);
+      BitSet incoming = iprot.readBitSet(11);
       if (incoming.get(0)) {
         struct.partitionname = iprot.readString();
         struct.setPartitionnameIsSet(true);
@@ -1633,6 +1830,14 @@ import org.slf4j.LoggerFactory;
       if (incoming.get(8)) {
         struct.id = iprot.readI64();
         struct.setIdIsSet(true);
+      }
+      if (incoming.get(9)) {
+        struct.errorMessage = iprot.readString();
+        struct.setErrorMessageIsSet(true);
+      }
+      if (incoming.get(10)) {
+        struct.enqueueTime = iprot.readI64();
+        struct.setEnqueueTimeIsSet(true);
       }
     }
   }

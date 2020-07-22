@@ -27,17 +27,14 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 /**
  * Operation process of locking a table.
  */
-public class LockTableOperation extends DDLOperation {
-  private final LockTableDesc desc;
-
+public class LockTableOperation extends DDLOperation<LockTableDesc> {
   public LockTableOperation(DDLOperationContext context, LockTableDesc desc) {
-    super(context);
-    this.desc = desc;
+    super(context, desc);
   }
 
   @Override
   public int execute() throws HiveException {
-    Context ctx = context.getDriverContext().getCtx();
+    Context ctx = context.getContext();
     HiveTxnManager txnManager = ctx.getHiveTxnManager();
     return txnManager.lockTable(context.getDb(), desc);
   }

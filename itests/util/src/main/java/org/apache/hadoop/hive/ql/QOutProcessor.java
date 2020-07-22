@@ -35,6 +35,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hive.ql.QTestMiniClusters.FsType;
+import org.apache.hadoop.hive.ql.qoption.QTestReplaceHandler;
 
 /**
  * QOutProcessor: produces the final q.out from original q.out by postprocessing (e.g. masks)
@@ -88,61 +89,75 @@ public class QOutProcessor {
   }
   
   private final Pattern[] planMask = toPattern(new String[] {
-      ".*file:.*",
-      ".*pfile:.*",
-      ".*/tmp/.*",
-      ".*invalidscheme:.*",
-      ".*lastUpdateTime.*",
-      ".*lastAccessTime.*",
-      ".*lastModifiedTime.*",
-      ".*[Oo]wner.*",
-      ".*CreateTime.*",
-      ".*LastAccessTime.*",
-      ".*Location.*",
-      ".*LOCATION '.*",
-      ".*transient_lastDdlTime.*",
-      ".*last_modified_.*",
-      ".*at org.*",
-      ".*at sun.*",
-      ".*at java.*",
-      ".*at junit.*",
-      ".*Caused by:.*",
-      ".*LOCK_QUERYID:.*",
-      ".*LOCK_TIME:.*",
-      ".*grantTime.*",
       ".*[.][.][.] [0-9]* more.*",
-      ".*job_[0-9_]*.*",
-      ".*job_local[0-9_]*.*",
-      ".*USING 'java -cp.*",
-      "^Deleted.*",
-      ".*DagName:.*",
-      ".*DagId:.*",
-      ".*Input:.*/data/files/.*",
-      ".*Output:.*/data/files/.*",
-      ".*total number of created files now is.*",
-      ".*.hive-staging.*",
       "pk_-?[0-9]*_[0-9]*_[0-9]*",
       "fk_-?[0-9]*_[0-9]*_[0-9]*",
       "uk_-?[0-9]*_[0-9]*_[0-9]*",
       "nn_-?[0-9]*_[0-9]*_[0-9]*", // not null constraint name
       "dc_-?[0-9]*_[0-9]*_[0-9]*", // default constraint name
-      ".*at com\\.sun\\.proxy.*",
-      ".*at com\\.jolbox.*",
-      ".*at com\\.zaxxer.*",
       "org\\.apache\\.hadoop\\.hive\\.metastore\\.model\\.MConstraint@([0-9]|[a-z])*",
-      "^Repair: Added partition to metastore.*",
-      "^latestOffsets.*",
-      "^minimumLag.*"
   });
 
-  public QOutProcessor(FsType fsType) {
+  // Using patterns for matching the whole line can take a long time, therefore we should try to avoid it
+  // in case of really long lines trying to match a .*some string.* may take up to 4 seconds each!
+
+  // Using String.startsWith instead of pattern, as it is much faster
+  private final String[] maskIfStartsWith = new String[] {
+      "Deleted",
+      "Repair: Added partition to metastore",
+      "latestOffsets",
+      "minimumLag"
+  };
+
+  // Using String.contains instead of pattern, as it is much faster
+  private final String[] maskIfContains = new String[] {
+      "file:",
+      "pfile:",
+      "/tmp/",
+      "invalidscheme:",
+      "lastUpdateTime",
+      "lastAccessTime",
+      "lastModifiedTim",
+      "Owner",
+      "owner",
+      "CreateTime",
+      "LastAccessTime",
+      "Location",
+      "LOCATION '",
+      "transient_lastDdlTime",
+      "last_modified_",
+      "at org",
+      "at sun",
+      "at java",
+      "at junit",
+      "Caused by:",
+      "LOCK_QUERYID:",
+      "LOCK_TIME:",
+      "grantTime",
+      "job_",
+      "USING 'java -cp",
+      "DagName:",
+      "DagId:",
+      "total number of created files now is",
+      "hive-staging",
+      "at com.sun.proxy",
+      "at com.jolbox",
+      "at com.zaxxer"
+  };
+
+  // Using String.contains instead of pattern, as it is much faster
+  private final String[][] maskIfContainsMultiple = new String[][] {
+    {"Input:", "/data/files/"},
+    {"Output:", "/data/files/"}
+  };
+
+  private final QTestReplaceHandler replaceHandler;
+
+  public QOutProcessor(FsType fsType, QTestReplaceHandler replaceHandler) {
     this.fsType = fsType;
+    this.replaceHandler = replaceHandler;
   }
 
-  public QOutProcessor() {
-    this.fsType = FsType.HDFS;
-  }
-  
   private Pattern[] toPattern(String[] patternStrs) {
     Pattern[] patterns = new Pattern[patternStrs.length];
     for (int i = 0; i < patternStrs.length; i++) {
@@ -251,11 +266,42 @@ public class QOutProcessor {
         }
       }
 
+      for (String prefix : maskIfStartsWith) {
+        if (result.line.startsWith(prefix)) {
+          result.line = MASK_PATTERN;
+        }
+      }
+
+      for (String word : maskIfContains) {
+        if (result.line.contains(word)) {
+          result.line = MASK_PATTERN;
+        }
+      }
+
+      for (String[] words : maskIfContainsMultiple) {
+        int pos = 0;
+        boolean containsAllInOrder = true;
+        for (String word : words) {
+          int wordPos = result.line.substring(pos).indexOf(word);
+          if (wordPos == -1) {
+            containsAllInOrder = false;
+            break;
+          } else {
+            pos += wordPos + word.length();
+          }
+        }
+        if (containsAllInOrder) {
+          result.line = MASK_PATTERN;
+        }
+      }
+
       for (Pattern pattern : planMask) {
         result.line = pattern.matcher(result.line).replaceAll(MASK_PATTERN);
       }
     }
-    
+
+    result.line = replaceHandler.processLine(result.line);
+
     return result;
   }
 

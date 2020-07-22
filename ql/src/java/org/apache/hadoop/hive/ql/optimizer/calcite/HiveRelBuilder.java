@@ -35,12 +35,14 @@ import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.hadoop.hive.ql.optimizer.calcite.functions.HiveMergeableAggregate;
 import org.apache.hadoop.hive.ql.optimizer.calcite.functions.HiveSqlCountAggFunction;
 import org.apache.hadoop.hive.ql.optimizer.calcite.functions.HiveSqlMinMaxAggFunction;
 import org.apache.hadoop.hive.ql.optimizer.calcite.functions.HiveSqlSumAggFunction;
 import org.apache.hadoop.hive.ql.optimizer.calcite.functions.HiveSqlSumEmptyIsZeroAggFunction;
 import org.apache.hadoop.hive.ql.optimizer.calcite.reloperators.HiveFloorDate;
 
+import com.google.common.collect.ImmutableList;
 
 /**
  * Builder for relational expressions in Hive.
@@ -92,8 +94,8 @@ public class HiveRelBuilder extends RelBuilder {
 
   @Override
   public RelBuilder filter(Iterable<? extends RexNode> predicates) {
-    final RexNode x = RexUtil.simplify(cluster.getRexBuilder(),
-            RexUtil.composeConjunction(cluster.getRexBuilder(), predicates, false));
+    final RexNode x = RexUtil.composeConjunction(
+        cluster.getRexBuilder(), predicates, false);
     if (!x.isAlwaysTrue()) {
       final RelNode input = build();
       final RelNode filter = HiveRelFactories.HIVE_FILTER_FACTORY.createFilter(input, x);
@@ -139,6 +141,10 @@ public class HiveRelBuilder extends RelBuilder {
   }
 
   public static SqlAggFunction getRollup(SqlAggFunction aggregation) {
+    if (aggregation instanceof HiveMergeableAggregate) {
+      HiveMergeableAggregate mAgg = (HiveMergeableAggregate) aggregation;
+      return mAgg.getMergeAggFunction();
+    }
     if (aggregation instanceof HiveSqlSumAggFunction
         || aggregation instanceof HiveSqlMinMaxAggFunction
         || aggregation instanceof HiveSqlSumEmptyIsZeroAggFunction) {
@@ -160,4 +166,10 @@ public class HiveRelBuilder extends RelBuilder {
     return false;
   }
 
+  /** Make the method visible */
+  @Override
+  public AggCall aggregateCall(SqlAggFunction aggFunction, boolean distinct, boolean approximate, boolean ignoreNulls,
+      RexNode filter, ImmutableList<RexNode> orderKeys, String alias, ImmutableList<RexNode> operands) {
+    return super.aggregateCall(aggFunction, distinct, approximate, ignoreNulls, filter, orderKeys, alias, operands);
+  }
 }

@@ -17,11 +17,12 @@
  */
 package org.apache.hadoop.hive.ql.parse.repl.load.message;
 
+import org.apache.hadoop.hive.common.TableName;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.messaging.AlterPartitionMessage;
-import org.apache.hadoop.hive.ql.ddl.DDLWork2;
-import org.apache.hadoop.hive.ql.ddl.table.partition.AlterTableRenamePartitionDesc;
+import org.apache.hadoop.hive.ql.ddl.DDLWork;
+import org.apache.hadoop.hive.ql.ddl.table.partition.rename.AlterTableRenamePartitionDesc;
 import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.TaskFactory;
 import org.apache.hadoop.hive.ql.exec.repl.util.ReplUtils;
@@ -36,16 +37,16 @@ import java.util.Map;
 
 public class RenamePartitionHandler extends AbstractMessageHandler {
   @Override
-  public List<Task<? extends Serializable>> handle(Context context)
+  public List<Task<?>> handle(Context context)
       throws SemanticException {
 
     AlterPartitionMessage msg = deserializer.getAlterPartitionMessage(context.dmd.getPayload());
     String actualDbName = context.isDbNameEmpty() ? msg.getDB() : context.dbName;
-    String actualTblName = context.isTableNameEmpty() ? msg.getTable() : context.tableName;
+    String actualTblName = msg.getTable();
 
     Map<String, String> newPartSpec = new LinkedHashMap<>();
     Map<String, String> oldPartSpec = new LinkedHashMap<>();
-    String tableName = actualDbName + "." + actualTblName;
+    TableName tableName = TableName.fromString(actualTblName, null, actualDbName);
     Table tableObj;
     ReplicationSpec replicationSpec = context.eventOnlyReplicationSpec();
     try {
@@ -63,8 +64,8 @@ public class RenamePartitionHandler extends AbstractMessageHandler {
       AlterTableRenamePartitionDesc renamePtnDesc = new AlterTableRenamePartitionDesc(
               tableName, oldPartSpec, newPartSpec, replicationSpec, null);
       renamePtnDesc.setWriteId(msg.getWriteId());
-      Task<DDLWork2> renamePtnTask = TaskFactory.get(
-          new DDLWork2(readEntitySet, writeEntitySet, renamePtnDesc), context.hiveConf);
+      Task<DDLWork> renamePtnTask = TaskFactory.get(
+          new DDLWork(readEntitySet, writeEntitySet, renamePtnDesc), context.hiveConf);
       context.log.debug("Added rename ptn task : {}:{}->{}",
                         renamePtnTask.getId(), oldPartSpec, newPartSpec);
       updatedMetadata.set(context.dmd.getEventTo().toString(), actualDbName, actualTblName, newPartSpec);

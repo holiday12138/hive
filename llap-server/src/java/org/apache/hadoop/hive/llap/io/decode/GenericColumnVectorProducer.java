@@ -52,6 +52,7 @@ import org.apache.hive.common.util.FixedSizedObjectPool;
 import org.apache.orc.CompressionKind;
 import org.apache.orc.OrcFile;
 import org.apache.orc.OrcProto;
+import org.apache.orc.OrcProto.CalendarKind;
 import org.apache.orc.OrcProto.ColumnEncoding;
 import org.apache.orc.OrcProto.RowIndex;
 import org.apache.orc.OrcProto.RowIndexEntry;
@@ -84,8 +85,7 @@ public class GenericColumnVectorProducer implements ColumnVectorProducer {
       SchemaEvolutionFactory sef, InputFormat<?, ?> sourceInputFormat, Deserializer sourceSerDe,
       Reporter reporter, JobConf job, Map<Path, PartitionDesc> parts) throws IOException {
     cacheMetrics.incrCacheReadRequests();
-    OrcEncodedDataConsumer edc = new OrcEncodedDataConsumer(
-        consumer, includes, false, counters, ioMetrics);
+    OrcEncodedDataConsumer edc = new OrcEncodedDataConsumer(consumer, includes, counters, ioMetrics);
     SerDeFileMetadata fm;
     try {
       fm = new SerDeFileMetadata(sourceSerDe);
@@ -291,6 +291,11 @@ public class GenericColumnVectorProducer implements ColumnVectorProducer {
     @Override
     public OrcFile.Version getFileVersion() {
       return null;
+    }
+
+    @Override
+    public CalendarKind getCalendar() {
+      return CalendarKind.JULIAN_GREGORIAN;
     }
   }
 }

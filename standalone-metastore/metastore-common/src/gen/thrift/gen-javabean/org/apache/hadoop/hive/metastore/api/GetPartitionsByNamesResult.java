@@ -354,14 +354,14 @@ import org.slf4j.LoggerFactory;
           case 1: // PARTITIONS
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
-                org.apache.thrift.protocol.TList _list578 = iprot.readListBegin();
-                struct.partitions = new ArrayList<Partition>(_list578.size);
-                Partition _elem579;
-                for (int _i580 = 0; _i580 < _list578.size; ++_i580)
+                org.apache.thrift.protocol.TList _list602 = iprot.readListBegin();
+                struct.partitions = new ArrayList<Partition>(_list602.size);
+                Partition _elem603;
+                for (int _i604 = 0; _i604 < _list602.size; ++_i604)
                 {
-                  _elem579 = new Partition();
-                  _elem579.read(iprot);
-                  struct.partitions.add(_elem579);
+                  _elem603 = new Partition();
+                  _elem603.read(iprot);
+                  struct.partitions.add(_elem603);
                 }
                 iprot.readListEnd();
               }
@@ -387,9 +387,9 @@ import org.slf4j.LoggerFactory;
         oprot.writeFieldBegin(PARTITIONS_FIELD_DESC);
         {
           oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, struct.partitions.size()));
-          for (Partition _iter581 : struct.partitions)
+          for (Partition _iter605 : struct.partitions)
           {
-            _iter581.write(oprot);
+            _iter605.write(oprot);
           }
           oprot.writeListEnd();
         }
@@ -414,9 +414,9 @@ import org.slf4j.LoggerFactory;
       TTupleProtocol oprot = (TTupleProtocol) prot;
       {
         oprot.writeI32(struct.partitions.size());
-        for (Partition _iter582 : struct.partitions)
+        for (Partition _iter606 : struct.partitions)
         {
-          _iter582.write(oprot);
+          _iter606.write(oprot);
         }
       }
     }
@@ -425,14 +425,14 @@ import org.slf4j.LoggerFactory;
     public void read(org.apache.thrift.protocol.TProtocol prot, GetPartitionsByNamesResult struct) throws org.apache.thrift.TException {
       TTupleProtocol iprot = (TTupleProtocol) prot;
       {
-        org.apache.thrift.protocol.TList _list583 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
-        struct.partitions = new ArrayList<Partition>(_list583.size);
-        Partition _elem584;
-        for (int _i585 = 0; _i585 < _list583.size; ++_i585)
+        org.apache.thrift.protocol.TList _list607 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRUCT, iprot.readI32());
+        struct.partitions = new ArrayList<Partition>(_list607.size);
+        Partition _elem608;
+        for (int _i609 = 0; _i609 < _list607.size; ++_i609)
         {
-          _elem584 = new Partition();
-          _elem584.read(iprot);
-          struct.partitions.add(_elem584);
+          _elem608 = new Partition();
+          _elem608.read(iprot);
+          struct.partitions.add(_elem608);
         }
       }
       struct.setPartitionsIsSet(true);

@@ -30,6 +30,7 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -40,7 +41,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -52,7 +53,6 @@ import org.apache.hadoop.hive.common.io.SessionStream;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
-import org.apache.hadoop.hive.metastore.txn.TxnDbUtil;
 import org.apache.hadoop.hive.ql.QTestMiniClusters.FsType;
 import org.apache.hadoop.hive.ql.cache.results.QueryResultsCache;
 import org.apache.hadoop.hive.ql.dataset.QTestDatasetHandler;
@@ -72,10 +72,20 @@ import org.apache.hadoop.hive.ql.parse.SemanticAnalyzer;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.mapper.StatsSources;
 import org.apache.hadoop.hive.ql.processors.CommandProcessor;
+import org.apache.hadoop.hive.ql.processors.CommandProcessorException;
 import org.apache.hadoop.hive.ql.processors.CommandProcessorFactory;
 import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
 import org.apache.hadoop.hive.ql.processors.HiveCommand;
+import org.apache.hadoop.hive.ql.qoption.QTestAuthorizerHandler;
+import org.apache.hadoop.hive.ql.qoption.QTestDisabledHandler;
+import org.apache.hadoop.hive.ql.qoption.QTestOptionDispatcher;
+import org.apache.hadoop.hive.ql.qoption.QTestReplaceHandler;
+import org.apache.hadoop.hive.ql.qoption.QTestSysDbHandler;
+import org.apache.hadoop.hive.ql.qoption.QTestTransactional;
+import org.apache.hadoop.hive.ql.scheduled.QTestScheduledQueryCleaner;
+import org.apache.hadoop.hive.ql.scheduled.QTestScheduledQueryServiceProvider;
 import org.apache.hadoop.hive.ql.session.SessionState;
+import org.apache.hive.common.util.ProcessUtils;
 import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,19 +116,20 @@ public class QTestUtil {
   protected Hive db;
   protected HiveConf conf;
   protected HiveConf savedConf;
-  private IDriver drv;
   private BaseSemanticAnalyzer sem;
   private CliDriver cliDriver;
   private final QTestMiniClusters miniClusters = new QTestMiniClusters();
   private final QOutProcessor qOutProcessor;
   private static QTestResultProcessor qTestResultProcessor = new QTestResultProcessor();
   protected QTestDatasetHandler datasetHandler;
+  protected QTestReplaceHandler replaceHandler;
   private final String initScript;
   private final String cleanupScript;
+  QTestOptionDispatcher dispatcher = new QTestOptionDispatcher();
 
   private boolean isSessionStateStarted = false;
 
-  protected CliDriver getCliDriver() {
+  public CliDriver getCliDriver() {
     if (cliDriver == null) {
       throw new RuntimeException("no clidriver");
     }
@@ -174,13 +185,16 @@ public class QTestUtil {
         testArgs.isWithLlapIo(),
         testArgs.getFsType());
 
+    logClassPath();
+
     Preconditions.checkNotNull(testArgs.getClusterType(), "ClusterType cannot be null");
 
     this.fsType = testArgs.getFsType();
     this.outDir = testArgs.getOutDir();
     this.logDir = testArgs.getLogDir();
     this.srcUDFs = getSrcUDFs();
-    this.qOutProcessor = new QOutProcessor(fsType);
+    this.replaceHandler = new QTestReplaceHandler();
+    this.qOutProcessor = new QOutProcessor(fsType, replaceHandler);
 
     // HIVE-14443 move this fall-back logic to CliConfigs
     if (testArgs.getConfDir() != null && !testArgs.getConfDir().isEmpty()) {
@@ -191,25 +205,60 @@ public class QTestUtil {
       System.out.println("Setting hive-site: " + HiveConf.getHiveSiteLocation());
     }
 
-    QueryState queryState = new QueryState.Builder().withHiveConf(new HiveConf(IDriver.class)).build();
-    conf = queryState.getConf();
-    sem = new SemanticAnalyzer(queryState);
+    // For testing configurations set by System.setProperties
+    System.setProperty("hive.query.max.length", "100Mb");
+
+    conf = new HiveConf(IDriver.class);
+    setMetaStoreProperties();
 
     this.miniClusters.setup(testArgs, conf, getScriptsDir(), logDir);
 
     initConf();
 
-    datasetHandler = new QTestDatasetHandler(this, conf);
+    datasetHandler = new QTestDatasetHandler(conf);
     testFiles = datasetHandler.getDataDir(conf);
     conf.set("test.data.dir", datasetHandler.getDataDir(conf));
+    conf.setVar(ConfVars.HIVE_QUERY_RESULTS_CACHE_DIRECTORY, "/tmp/hive/_resultscache_" + ProcessUtils.getPid());
+    dispatcher.register("dataset", datasetHandler);
+    dispatcher.register("replace", replaceHandler);
+    dispatcher.register("sysdb", new QTestSysDbHandler());
+    dispatcher.register("transactional", new QTestTransactional());
+    dispatcher.register("scheduledqueryservice", new QTestScheduledQueryServiceProvider(conf));
+    dispatcher.register("scheduledquerycleaner", new QTestScheduledQueryCleaner());
+    dispatcher.register("authorizer", new QTestAuthorizerHandler());
+    dispatcher.register("disabled", new QTestDisabledHandler());
 
     String scriptsDir = getScriptsDir();
 
     this.initScript = scriptsDir + File.separator + testArgs.getInitScript();
     this.cleanupScript = scriptsDir + File.separator + testArgs.getCleanupScript();
 
-    postInit();
     savedConf = new HiveConf(conf);
+
+  }
+
+  private void logClassPath() {
+    String classpath = System.getProperty("java.class.path");
+    String[] classpathEntries = classpath.split(File.pathSeparator);
+    LOG.info("QTestUtil classpath: " + String.join("\n", Arrays.asList(classpathEntries)));
+  }
+
+  private void setMetaStoreProperties() {
+    setMetastoreConfPropertyFromSystemProperty(MetastoreConf.ConfVars.CONNECT_URL_KEY);
+    setMetastoreConfPropertyFromSystemProperty(MetastoreConf.ConfVars.CONNECTION_DRIVER);
+    setMetastoreConfPropertyFromSystemProperty(MetastoreConf.ConfVars.CONNECTION_USER_NAME);
+    setMetastoreConfPropertyFromSystemProperty(MetastoreConf.ConfVars.PWD);
+    setMetastoreConfPropertyFromSystemProperty(MetastoreConf.ConfVars.AUTO_CREATE_ALL);
+  }
+
+  private void setMetastoreConfPropertyFromSystemProperty(MetastoreConf.ConfVars var) {
+    if (System.getProperty(var.getVarname()) != null) {
+      if (var.getDefaultVal().getClass() == Boolean.class) {
+        MetastoreConf.setBoolVar(conf, var, Boolean.getBoolean(System.getProperty(var.getVarname())));
+      } else {
+        MetastoreConf.setVar(conf, var, System.getProperty(var.getVarname()));
+      }
+    }
   }
 
   private String getScriptsDir() {
@@ -250,6 +299,7 @@ public class QTestUtil {
    * Clear out any side effects of running tests
    */
   public void clearPostTestEffects() throws Exception {
+    dispatcher.afterTest(this);
     miniClusters.postTest(conf);
   }
 
@@ -405,8 +455,7 @@ public class QTestUtil {
     clearUDFsCreatedDuringTests();
     clearKeysCreatedInTests();
     StatsSources.clearGlobalStats();
-    TxnDbUtil.cleanDb(conf);
-    TxnDbUtil.prepDb(conf);
+    dispatcher.afterTest(this);
   }
 
   protected void initConfFromSetup() throws Exception {
@@ -427,11 +476,13 @@ public class QTestUtil {
     }
     conf.setBoolean("hive.test.shutdown.phase", true);
 
-    clearTablesCreatedDuringTests();
-    clearUDFsCreatedDuringTests();
     clearKeysCreatedInTests();
 
-    cleanupFromFile();
+    String metastoreDb = QTestSystemProperties.getMetaStoreDb();
+    if (metastoreDb == null || "derby".equalsIgnoreCase(metastoreDb)) {
+      // otherwise, the docker container is already destroyed by this time
+      cleanupFromFile();
+    }
 
     // delete any contents in the warehouse dir
     Path p = new Path(testWarehouse);
@@ -458,9 +509,10 @@ public class QTestUtil {
       String cleanupCommands = FileUtils.readFileToString(cleanupFile);
       LOG.info("Cleanup (" + cleanupScript + "):\n" + cleanupCommands);
 
-      int result = getCliDriver().processLine(cleanupCommands).getResponseCode();
-      if (result != 0) {
-        LOG.error("Failed during cleanup processLine with code={}. Ignoring", result);
+      try {
+        getCliDriver().processLine(cleanupCommands);
+      } catch (CommandProcessorException e) {
+        LOG.error("Failed during cleanup processLine with code={}. Ignoring", e.getResponseCode());
         // TODO Convert this to an Assert.fail once HIVE-14682 is fixed
       }
     } else {
@@ -497,20 +549,22 @@ public class QTestUtil {
     String initCommands = FileUtils.readFileToString(scriptFile);
     LOG.info("Initial setup (" + initScript + "):\n" + initCommands);
 
-    int result = cliDriver.processLine(initCommands).getResponseCode();
-    LOG.info("Result from cliDrriver.processLine in createSources=" + result);
-    if (result != 0) {
-      Assert.fail("Failed during createSources processLine with code=" + result);
+    try {
+      cliDriver.processLine(initCommands);
+      LOG.info("Result from cliDrriver.processLine in createSources=0");
+    } catch (CommandProcessorException e) {
+      Assert.fail("Failed during createSources processLine with code=" + e.getResponseCode());
     }
   }
 
-  private void postInit() throws Exception {
+  public void postInit() throws Exception {
     miniClusters.postInit(conf);
+
+    sem = new SemanticAnalyzer(new QueryState.Builder().withHiveConf(conf).build());
 
     testWarehouse = conf.getVar(HiveConf.ConfVars.METASTOREWAREHOUSE);
 
     db = Hive.get(conf);
-    drv = DriverFactory.newDriver(conf);
     pd = new ParseDriver();
 
     initMaterializedViews(); // Create views registry
@@ -541,7 +595,9 @@ public class QTestUtil {
   public String cliInit(File file) throws Exception {
     String fileName = file.getName();
 
-    datasetHandler.initDataSetForTest(file, getCliDriver());
+    dispatcher.process(file);
+    dispatcher.beforeTest(this);
+
 
     if (qTestResultProcessor.shouldNotReuseSession(fileName)) {
       newSession(false);
@@ -622,7 +678,7 @@ public class QTestUtil {
     }
   }
 
-  public int executeAdhocCommand(String q) {
+  public int executeAdhocCommand(String q) throws CommandProcessorException {
     if (!q.contains(";")) {
       return -1;
     }
@@ -630,26 +686,23 @@ public class QTestUtil {
     String q1 = q.split(";")[0] + ";";
 
     LOG.debug("Executing " + q1);
-    return cliDriver.processLine(q1).getResponseCode();
+    cliDriver.processLine(q1);
+    return 0;
   }
 
-  public int execute(String tname) {
-    return drv.run(qMap.get(tname)).getResponseCode();
-  }
-
-  public CommandProcessorResponse executeClient(String tname1, String tname2) {
+  public CommandProcessorResponse executeClient(String tname1, String tname2) throws CommandProcessorException {
     String commands =
         getCommand(tname1) + System.getProperty("line.separator") + getCommand(tname2);
     return executeClientInternal(commands);
   }
 
-  public CommandProcessorResponse executeClient(String fileName) {
+  public CommandProcessorResponse executeClient(String fileName) throws CommandProcessorException {
     return executeClientInternal(getCommand(fileName));
   }
 
-  private CommandProcessorResponse executeClientInternal(String commands) {
+  private CommandProcessorResponse executeClientInternal(String commands) throws CommandProcessorException {
     List<String> cmds = CliDriver.splitSemiColon(commands);
-    CommandProcessorResponse response = new CommandProcessorResponse(0);
+    CommandProcessorResponse response = new CommandProcessorResponse();
 
     StringBuilder command = new StringBuilder();
     QTestSyntaxUtil qtsu = new QTestSyntaxUtil(this, conf, pd);
@@ -670,18 +723,20 @@ public class QTestUtil {
       }
 
       String strCommand = command.toString();
-      if (isCommandUsedForTesting(strCommand)) {
-        response = executeTestCommand(strCommand);
-      } else {
-        response = cliDriver.processLine(strCommand);
-      }
-
-      if (response.getResponseCode() != 0 && !ignoreErrors()) {
-        break;
+      try {
+        if (isCommandUsedForTesting(strCommand)) {
+          response = executeTestCommand(strCommand);
+        } else {
+          response = cliDriver.processLine(strCommand);
+        }
+      } catch (CommandProcessorException e) {
+        if (!ignoreErrors()) {
+          throw e;
+        }
       }
       command.setLength(0);
     }
-    if (response.getResponseCode() == 0 && SessionState.get() != null) {
+    if (SessionState.get() != null) {
       SessionState.get().setLastCommand(null);  // reset
     }
     return response;
@@ -706,7 +761,7 @@ public class QTestUtil {
     }
   }
 
-  private CommandProcessorResponse executeTestCommand(final String command) {
+  private CommandProcessorResponse executeTestCommand(String command) throws CommandProcessorException {
     String commandName = command.trim().split("\\s+")[0];
     String commandArgs = command.trim().substring(commandName.length());
 
@@ -716,8 +771,7 @@ public class QTestUtil {
 
     //replace ${hiveconf:hive.metastore.warehouse.dir} with actual dir if existed.
     //we only want the absolute path, so remove the header, such as hdfs://localhost:57145
-    String
-        wareHouseDir =
+    String wareHouseDir =
         SessionState.get().getConf().getVar(ConfVars.METASTOREWAREHOUSE).replaceAll("^[a-zA-Z]+://.*?:\\d+", "");
     commandArgs = commandArgs.replaceAll("\\$\\{hiveconf:hive\\.metastore\\.warehouse\\.dir\\}", wareHouseDir);
 
@@ -730,16 +784,14 @@ public class QTestUtil {
     try {
       CommandProcessor proc = getTestCommand(commandName);
       if (proc != null) {
-        CommandProcessorResponse response = proc.run(commandArgs.trim());
-
-        int rc = response.getResponseCode();
-        if (rc != 0) {
-          SessionState.getConsole()
-              .printError(response.toString(),
-                  response.getException() != null ? Throwables.getStackTraceAsString(response.getException()) : "");
+        try {
+          CommandProcessorResponse response = proc.run(commandArgs.trim());
+          return response;
+        } catch (CommandProcessorException e) {
+          SessionState.getConsole().printError(e.toString(),
+                  e.getCause() != null ? Throwables.getStackTraceAsString(e.getCause()) : "");
+          throw e;
         }
-
-        return response;
       } else {
         throw new RuntimeException("Could not get CommandProcessor for command: " + commandName);
       }
@@ -901,16 +953,14 @@ public class QTestUtil {
     String outFileName = outPath(outDir, tname + outFileExtension);
 
     File f = new File(logDir, tname + outFileExtension);
-
     qOutProcessor.maskPatterns(f.getPath(), tname);
-    QTestProcessExecResult exitVal = qTestResultProcessor.executeDiffCommand(f.getPath(), outFileName, false, tname);
 
     if (QTestSystemProperties.shouldOverwriteResults()) {
       qTestResultProcessor.overwriteResults(f.getPath(), outFileName);
       return QTestProcessExecResult.createWithoutOutput(0);
+    } else {
+      return qTestResultProcessor.executeDiffCommand(f.getPath(), outFileName, false, tname);
     }
-
-    return exitVal;
   }
 
   public QTestProcessExecResult checkCompareCliDriverResults(String tname, List<String> outputs) throws Exception {
@@ -930,7 +980,7 @@ public class QTestUtil {
   }
 
   public ASTNode parseQuery(String tname) throws Exception {
-    return pd.parse(qMap.get(tname));
+    return pd.parse(qMap.get(tname)).getTree();
   }
 
   public List<Task<?>> analyzeAST(ASTNode ast) throws Exception {

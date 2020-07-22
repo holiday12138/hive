@@ -20,6 +20,7 @@ package org.apache.hadoop.hive.ql.udf.generic;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Optional;
 
 import org.apache.hadoop.hive.common.classification.InterfaceAudience;
 import org.apache.hadoop.hive.common.classification.InterfaceStability;
@@ -65,7 +66,7 @@ import org.apache.hadoop.io.LongWritable;
  * variable length of arguments. 3. It can accept an infinite number of function
  * signature - for example, it's easy to write a GenericUDF that accepts
  * array&lt;int&gt;, array&lt;array&lt;int&gt;&gt; and so on (arbitrary levels of nesting). 4. It
- * can do short-circuit evaluations using DeferedObject.
+ * can do short-circuit evaluations using {@link DeferredObject}.
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -76,8 +77,8 @@ public abstract class GenericUDF implements Closeable {
       "th", "th", "th", "th", "th" };
 
   /**
-   * A Defered Object allows us to do lazy-evaluation and short-circuiting.
-   * GenericUDF use DeferedObject to pass arguments.
+   * A Deferred Object allows us to do lazy-evaluation and short-circuiting.
+   * GenericUDF use {@link DeferredObject} to pass arguments.
    */
   @InterfaceAudience.Public
   @InterfaceStability.Stable
@@ -637,5 +638,13 @@ public abstract class GenericUDF implements Closeable {
     default:
       return i + ORDINAL_SUFFIXES[i % 10];
     }
+  }
+
+  @SuppressWarnings("unchecked")
+  public <T> Optional<T> adapt(Class<T> clazz) {
+    if (clazz.isInstance(this)) {
+      return Optional.of((T) this);
+    }
+    return Optional.empty();
   }
 }

@@ -107,6 +107,7 @@ STAGE PLANS:
                 TableScan
                   alias: t1_n48
                   filterExpr: dec is not null (type: boolean)
+                  probeDecodeDetails: cacheKey:HASH_MAP_MAPJOIN_25_container, bigKeyColName:dec, smallTablePos:1, keyRatio:1.0448045757864632
                   Statistics: Num rows: 1049 Data size: 111776 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
@@ -133,13 +134,15 @@ STAGE PLANS:
                           0 _col0 (type: decimal(26,2))
                           1 _col0 (type: decimal(26,2))
                         Map Join Vectorization:
-                            bigTableKeyExpressions: col 0:decimal(26,2)
-                            bigTableValueExpressions: col 0:decimal(26,2)
-                            className: VectorMapJoinOperator
-                            native: false
-                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true
-                            nativeConditionsNotMet: Optimized Table and Supports Key Types IS false
-                            nativeNotSupportedKeyTypes: DECIMAL
+                            bigTableKeyColumns: 0:decimal(26,2)
+                            bigTableRetainColumnNums: [0]
+                            bigTableValueColumns: 0:decimal(26,2)
+                            className: VectorMapJoinInnerBigOnlyMultiKeyOperator
+                            native: true
+                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
+                            nonOuterSmallTableKeyMapping: []
+                            projectedOutput: 0:decimal(26,2), 0:decimal(26,2)
+                            hashTableImplementationType: OPTIMIZED
                         outputColumnNames: _col0, _col1
                         input vertices:
                           1 Map 2
@@ -197,6 +200,7 @@ STAGE PLANS:
                       Statistics: Num rows: 997 Data size: 106235 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: decimal(26,2))
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: decimal(26,2))
                         Reduce Sink Vectorization:
@@ -389,6 +393,7 @@ STAGE PLANS:
                 TableScan
                   alias: t1_n48
                   filterExpr: dec is not null (type: boolean)
+                  probeDecodeDetails: cacheKey:HASH_MAP_MAPJOIN_25_container, bigKeyColName:dec, smallTablePos:1, keyRatio:1.0448045757864632
                   Statistics: Num rows: 1049 Data size: 223552 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
@@ -415,13 +420,16 @@ STAGE PLANS:
                           0 _col0 (type: decimal(26,2))
                           1 _col0 (type: decimal(26,2))
                         Map Join Vectorization:
-                            bigTableKeyExpressions: col 0:decimal(26,2)
-                            bigTableValueExpressions: col 0:decimal(26,2), col 1:decimal(22,2)
-                            className: VectorMapJoinOperator
-                            native: false
-                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true
-                            nativeConditionsNotMet: Optimized Table and Supports Key Types IS false
-                            nativeNotSupportedKeyTypes: DECIMAL
+                            bigTableKeyColumns: 0:decimal(26,2)
+                            bigTableRetainColumnNums: [0, 1]
+                            bigTableValueColumns: 0:decimal(26,2), 1:decimal(22,2)
+                            className: VectorMapJoinInnerMultiKeyOperator
+                            native: true
+                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
+                            nonOuterSmallTableKeyMapping: []
+                            projectedOutput: 0:decimal(26,2), 1:decimal(22,2), 0:decimal(26,2), 3:decimal(24,0)
+                            smallTableValueMapping: 3:decimal(24,0)
+                            hashTableImplementationType: OPTIMIZED
                         outputColumnNames: _col0, _col1, _col2, _col3
                         input vertices:
                           1 Map 2
@@ -479,6 +487,7 @@ STAGE PLANS:
                       Statistics: Num rows: 997 Data size: 212470 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: decimal(26,2))
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: decimal(26,2))
                         Reduce Sink Vectorization:
@@ -749,6 +758,7 @@ STAGE PLANS:
                 TableScan
                   alias: t1_small
                   filterExpr: dec is not null (type: boolean)
+                  probeDecodeDetails: cacheKey:HASH_MAP_MAPJOIN_25_container, bigKeyColName:dec, smallTablePos:1, keyRatio:1.0448045757864632
                   Statistics: Num rows: 1049 Data size: 111776 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
@@ -775,13 +785,16 @@ STAGE PLANS:
                           0 _col0 (type: decimal(16,2))
                           1 _col0 (type: decimal(16,2))
                         Map Join Vectorization:
+                            bigTableKeyColumns: 3:decimal(16,2)
                             bigTableKeyExpressions: ConvertDecimal64ToDecimal(col 0:decimal(16,2)/DECIMAL_64) -> 3:decimal(16,2)
-                            bigTableValueExpressions: col 0:decimal(16,2)/DECIMAL_64
-                            className: VectorMapJoinOperator
-                            native: false
-                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true
-                            nativeConditionsNotMet: Optimized Table and Supports Key Types IS false
-                            nativeNotSupportedKeyTypes: DECIMAL
+                            bigTableRetainColumnNums: [0]
+                            bigTableValueColumns: 0:decimal(16,2)
+                            className: VectorMapJoinInnerBigOnlyMultiKeyOperator
+                            native: true
+                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
+                            nonOuterSmallTableKeyMapping: [3]
+                            projectedOutput: 0:decimal(16,2), 3:decimal(16,2)
+                            hashTableImplementationType: OPTIMIZED
                         outputColumnNames: _col0, _col1
                         input vertices:
                           1 Map 2
@@ -839,6 +852,7 @@ STAGE PLANS:
                       Statistics: Num rows: 997 Data size: 106235 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: decimal(16,2))
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: decimal(16,2))
                         Reduce Sink Vectorization:
@@ -1031,6 +1045,7 @@ STAGE PLANS:
                 TableScan
                   alias: t1_small
                   filterExpr: dec is not null (type: boolean)
+                  probeDecodeDetails: cacheKey:HASH_MAP_MAPJOIN_25_container, bigKeyColName:dec, smallTablePos:1, keyRatio:1.0448045757864632
                   Statistics: Num rows: 1049 Data size: 223552 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
@@ -1057,13 +1072,17 @@ STAGE PLANS:
                           0 _col0 (type: decimal(16,2))
                           1 _col0 (type: decimal(16,2))
                         Map Join Vectorization:
+                            bigTableKeyColumns: 3:decimal(16,2)
                             bigTableKeyExpressions: ConvertDecimal64ToDecimal(col 0:decimal(16,2)/DECIMAL_64) -> 3:decimal(16,2)
-                            bigTableValueExpressions: col 0:decimal(16,2)/DECIMAL_64, col 1:decimal(14,2)/DECIMAL_64
-                            className: VectorMapJoinOperator
-                            native: false
-                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true
-                            nativeConditionsNotMet: Optimized Table and Supports Key Types IS false
-                            nativeNotSupportedKeyTypes: DECIMAL
+                            bigTableRetainColumnNums: [0, 1]
+                            bigTableValueColumns: 0:decimal(16,2), 1:decimal(14,2)
+                            className: VectorMapJoinInnerMultiKeyOperator
+                            native: true
+                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
+                            nonOuterSmallTableKeyMapping: [3]
+                            projectedOutput: 0:decimal(16,2), 1:decimal(14,2), 3:decimal(16,2), 4:decimal(14,0)
+                            smallTableValueMapping: 4:decimal(14,0)
+                            hashTableImplementationType: OPTIMIZED
                         outputColumnNames: _col0, _col1, _col2, _col3
                         input vertices:
                           1 Map 2
@@ -1121,6 +1140,7 @@ STAGE PLANS:
                       Statistics: Num rows: 997 Data size: 212470 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: decimal(16,2))
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: decimal(16,2))
                         Reduce Sink Vectorization:
@@ -1315,6 +1335,7 @@ STAGE PLANS:
                 TableScan
                   alias: t1_small
                   filterExpr: dec is not null (type: boolean)
+                  probeDecodeDetails: cacheKey:HASH_MAP_MAPJOIN_25_container, bigKeyColName:dec, smallTablePos:1, keyRatio:1.0448045757864632
                   Statistics: Num rows: 1049 Data size: 111776 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
@@ -1341,13 +1362,15 @@ STAGE PLANS:
                           0 _col0 (type: decimal(16,2))
                           1 _col0 (type: decimal(16,2))
                         Map Join Vectorization:
-                            bigTableKeyExpressions: col 0:decimal(16,2)
-                            bigTableValueExpressions: col 0:decimal(16,2)
-                            className: VectorMapJoinOperator
-                            native: false
-                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true
-                            nativeConditionsNotMet: Optimized Table and Supports Key Types IS false
-                            nativeNotSupportedKeyTypes: DECIMAL
+                            bigTableKeyColumns: 0:decimal(16,2)
+                            bigTableRetainColumnNums: [0]
+                            bigTableValueColumns: 0:decimal(16,2)
+                            className: VectorMapJoinInnerBigOnlyMultiKeyOperator
+                            native: true
+                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
+                            nonOuterSmallTableKeyMapping: []
+                            projectedOutput: 0:decimal(16,2), 0:decimal(16,2)
+                            hashTableImplementationType: OPTIMIZED
                         outputColumnNames: _col0, _col1
                         input vertices:
                           1 Map 2
@@ -1406,6 +1429,7 @@ STAGE PLANS:
                       Statistics: Num rows: 997 Data size: 106235 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: decimal(16,2))
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: decimal(16,2))
                         Reduce Sink Vectorization:
@@ -1599,6 +1623,7 @@ STAGE PLANS:
                 TableScan
                   alias: t1_small
                   filterExpr: dec is not null (type: boolean)
+                  probeDecodeDetails: cacheKey:HASH_MAP_MAPJOIN_25_container, bigKeyColName:dec, smallTablePos:1, keyRatio:1.0448045757864632
                   Statistics: Num rows: 1049 Data size: 223552 Basic stats: COMPLETE Column stats: NONE
                   TableScan Vectorization:
                       native: true
@@ -1625,13 +1650,16 @@ STAGE PLANS:
                           0 _col0 (type: decimal(16,2))
                           1 _col0 (type: decimal(16,2))
                         Map Join Vectorization:
-                            bigTableKeyExpressions: col 0:decimal(16,2)
-                            bigTableValueExpressions: col 0:decimal(16,2), col 1:decimal(14,2)
-                            className: VectorMapJoinOperator
-                            native: false
-                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true
-                            nativeConditionsNotMet: Optimized Table and Supports Key Types IS false
-                            nativeNotSupportedKeyTypes: DECIMAL
+                            bigTableKeyColumns: 0:decimal(16,2)
+                            bigTableRetainColumnNums: [0, 1]
+                            bigTableValueColumns: 0:decimal(16,2), 1:decimal(14,2)
+                            className: VectorMapJoinInnerMultiKeyOperator
+                            native: true
+                            nativeConditionsMet: hive.mapjoin.optimized.hashtable IS true, hive.vectorized.execution.mapjoin.native.enabled IS true, hive.execution.engine tez IN [tez, spark] IS true, One MapJoin Condition IS true, No nullsafe IS true, Small table vectorizes IS true, Optimized Table and Supports Key Types IS true
+                            nonOuterSmallTableKeyMapping: []
+                            projectedOutput: 0:decimal(16,2), 1:decimal(14,2), 0:decimal(16,2), 3:decimal(14,0)
+                            smallTableValueMapping: 3:decimal(14,0)
+                            hashTableImplementationType: OPTIMIZED
                         outputColumnNames: _col0, _col1, _col2, _col3
                         input vertices:
                           1 Map 2
@@ -1690,6 +1718,7 @@ STAGE PLANS:
                       Statistics: Num rows: 997 Data size: 212470 Basic stats: COMPLETE Column stats: NONE
                       Reduce Output Operator
                         key expressions: _col0 (type: decimal(16,2))
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: decimal(16,2))
                         Reduce Sink Vectorization:

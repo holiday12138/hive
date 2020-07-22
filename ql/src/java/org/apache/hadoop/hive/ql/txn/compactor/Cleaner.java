@@ -30,7 +30,6 @@ import org.apache.hadoop.hive.metastore.txn.TxnStore;
 import org.apache.hadoop.hive.metastore.txn.TxnUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.ValidWriteIdList;
@@ -45,6 +44,7 @@ import org.apache.hadoop.hive.metastore.txn.CompactionInfo;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hive.common.util.Ref;
 
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
@@ -54,6 +54,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.apache.hadoop.hive.metastore.HiveMetaStore.HMSHandler.getMSForConf;
 import static org.apache.hadoop.hive.metastore.utils.MetaStoreUtils.getDefaultCatalog;
 
 /**
@@ -67,8 +68,8 @@ public class Cleaner extends MetaStoreCompactorThread {
   private ReplChangeManager replChangeManager;
 
   @Override
-  public void init(AtomicBoolean stop, AtomicBoolean looped) throws Exception {
-    super.init(stop, looped);
+  public void init(AtomicBoolean stop) throws Exception {
+    super.init(stop);
     replChangeManager = ReplChangeManager.getInstance(conf);
   }
 
@@ -80,10 +81,6 @@ public class Cleaner extends MetaStoreCompactorThread {
     }
 
     do {
-      // This is solely for testing.  It checks if the test has set the looped value to false,
-      // and if so remembers that and then sets it to true at the end.  We have to check here
-      // first to make sure we go through a complete iteration of the loop before resetting it.
-      boolean setLooped = !looped.get();
       TxnStore.MutexAPI.LockHandle handle = null;
       long startedAt = -1;
       // Make sure nothing escapes this run method and kills the metastore at large,
@@ -91,7 +88,7 @@ public class Cleaner extends MetaStoreCompactorThread {
       try {
         handle = txnHandler.getMutexAPI().acquireLock(TxnStore.MUTEX_KEY.Cleaner.name());
         startedAt = System.currentTimeMillis();
-        long minOpenTxnId = txnHandler.findMinOpenTxnId();
+        long minOpenTxnId = txnHandler.findMinOpenTxnIdForCleaner();
         for(CompactionInfo compactionInfo : txnHandler.findReadyToClean()) {
           clean(compactionInfo, minOpenTxnId);
         }
@@ -103,9 +100,6 @@ public class Cleaner extends MetaStoreCompactorThread {
         if (handle != null) {
           handle.releaseLocks();
         }
-      }
-      if (setLooped) {
-        looped.set(true);
       }
       // Now, go back to bed until it's time to do this again
       long elapsedTime = System.currentTimeMillis() - startedAt;
@@ -216,6 +210,7 @@ public class Cleaner extends MetaStoreCompactorThread {
     } catch (Exception e) {
       LOG.error("Caught exception when cleaning, unable to complete cleaning of " + ci + " " +
           StringUtils.stringifyException(e));
+      ci.errorMessage = e.getMessage();
       txnHandler.markFailed(ci);
     }
   }
@@ -223,9 +218,10 @@ public class Cleaner extends MetaStoreCompactorThread {
     return " id=" + ci.id;
   }
   private void removeFiles(String location, ValidWriteIdList writeIdList, CompactionInfo ci)
-          throws IOException, NoSuchObjectException {
+      throws IOException, NoSuchObjectException, MetaException {
     Path locPath = new Path(location);
-    AcidUtils.Directory dir = AcidUtils.getAcidState(locPath, conf, writeIdList);
+    AcidUtils.Directory dir = AcidUtils.getAcidState(locPath.getFileSystem(conf), locPath, conf, writeIdList, Ref.from(
+        false), false);
     List<Path> obsoleteDirs = dir.getObsolete();
     /**
      * add anything in 'dir'  that only has data from aborted transactions - no one should be
@@ -256,12 +252,12 @@ public class Cleaner extends MetaStoreCompactorThread {
     }
 
     FileSystem fs = filesToDelete.get(0).getFileSystem(conf);
-    Database db = rs.getDatabase(getDefaultCatalog(conf), ci.dbname);
-    Boolean isSourceOfRepl = ReplChangeManager.isSourceOfReplication(db);
+    Database db = getMSForConf(conf).getDatabase(getDefaultCatalog(conf), ci.dbname);
+    Table table = getMSForConf(conf).getTable(getDefaultCatalog(conf), ci.dbname, ci.tableName);
 
     for (Path dead : filesToDelete) {
       LOG.debug("Going to delete path " + dead.toString());
-      if (isSourceOfRepl) {
+      if (ReplChangeManager.shouldEnableCm(db, table)) {
         replChangeManager.recycle(dead, ReplChangeManager.RecycleType.MOVE, true);
       }
       fs.delete(dead, true);

@@ -22,17 +22,27 @@ import static org.junit.Assert.*;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.io.CacheTag;
 import org.apache.hadoop.hive.common.io.DataCache;
 import org.apache.hadoop.hive.common.io.DiskRange;
 import org.apache.hadoop.hive.common.io.DiskRangeList;
 
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.llap.IllegalCacheConfigurationException;
 import org.apache.hadoop.hive.llap.cache.LowLevelCache.Priority;
+import org.apache.hadoop.hive.llap.io.encoded.OrcEncodedDataReader;
 import org.apache.hadoop.hive.llap.io.metadata.MetadataCache;
 import org.apache.hadoop.hive.llap.io.metadata.MetadataCache.LlapBufferOrBuffers;
 import org.apache.hadoop.hive.llap.io.metadata.MetadataCache.LlapMetadataBuffer;
 import org.apache.hadoop.hive.llap.metrics.LlapDaemonCacheMetrics;
 import org.apache.hadoop.hive.ql.io.orc.encoded.IncompleteCb;
+import org.apache.orc.impl.OrcTail;
+
+import org.junit.Assert;
 import org.junit.Test;
 
 public class TestOrcMetadataCache {
@@ -66,6 +76,11 @@ public class TestOrcMetadataCache {
       return 0;
     }
 
+    @Override
+    public long evictEntity(Predicate<LlapCacheableBuffer> predicate) {
+      return 0;
+    }
+
     public void verifyEquals(int i) {
       assertEquals(i, lockCount);
       assertEquals(i, unlockCount);
@@ -95,6 +110,30 @@ public class TestOrcMetadataCache {
     @Override
     public void updateMaxSize(long maxSize) {
     }
+  }
+
+  @Test
+  public void testCaseSomePartialBuffersAreEvicted() {
+    final DummyMemoryManager mm = new DummyMemoryManager();
+    final DummyCachePolicy cp = new DummyCachePolicy();
+    final int MAX_ALLOC = 64;
+    final LlapDaemonCacheMetrics metrics = LlapDaemonCacheMetrics.create("", "");
+    final BuddyAllocator alloc = new BuddyAllocator(false, false, 8, MAX_ALLOC, 1, 4096, 0, null, mm, metrics, null, true);
+    final MetadataCache cache = new MetadataCache(alloc, mm, cp, true, metrics);
+    final Object fileKey1 = new Object();
+    final Random rdm = new Random();
+    final ByteBuffer smallBuffer = ByteBuffer.allocate(2 * MAX_ALLOC);
+    rdm.nextBytes(smallBuffer.array());
+    //put some metadata in the cache that needs multiple buffers (2 * MAX_ALLOC)
+    final LlapBufferOrBuffers result = cache.putFileMetadata(fileKey1, smallBuffer, null, null);
+    // assert that we have our 2 buffers
+    Assert.assertEquals(2, result.getMultipleLlapBuffers().length);
+    final LlapAllocatorBuffer[] buffers = result.getMultipleLlapBuffers();
+    //test setup where one buffer is evicted and therefore can not be locked
+    buffers[1].decRef();
+    buffers[1].invalidateAndRelease();
+    //Try to get the buffer should lead to cleaning the cache since some part was evicted.
+    Assert.assertNull(cache.getFileMetadata(fileKey1));
   }
 
   @Test
@@ -195,6 +234,34 @@ public class TestOrcMetadataCache {
     result = cache.getIncompleteCbs(fileKey1, new DiskRangeList(4, 5), 0, gotAllData);
     assertFalse(gotAllData.value);
     verifyResult(result, DRL, 4, 5);
+  }
+
+  @Test
+  public void testGetOrcTailForPath() throws Exception {
+    DummyMemoryManager mm = new DummyMemoryManager();
+    DummyCachePolicy cp = new DummyCachePolicy();
+    final int MAX_ALLOC = 64;
+    LlapDaemonCacheMetrics metrics = LlapDaemonCacheMetrics.create("", "");
+    BuddyAllocator alloc = new BuddyAllocator(
+        false, false, 8, MAX_ALLOC, 1, 4096, 0, null, mm, metrics, null, true);
+    MetadataCache cache = new MetadataCache(alloc, mm, cp, true, metrics);
+
+    Path path = new Path("../data/files/alltypesorc");
+    Configuration jobConf = new Configuration();
+    Configuration daemonConf = new Configuration();
+    CacheTag tag = CacheTag.build("test-table");
+    OrcTail uncached = OrcEncodedDataReader.getOrcTailForPath(path, jobConf, tag, daemonConf, cache);
+    jobConf.set(HiveConf.ConfVars.LLAP_IO_CACHE_ONLY.varname, "true");
+    OrcTail cached = OrcEncodedDataReader.getOrcTailForPath(path, jobConf, tag, daemonConf, cache);
+    assertEquals(uncached.getSerializedTail(), cached.getSerializedTail());
+    assertEquals(uncached.getFileTail(), cached.getFileTail());
+  }
+
+  @Test(expected = IllegalCacheConfigurationException.class)
+  public void testGetOrcTailForPathCacheNotReady() throws Exception {
+    Path path = new Path("../data/files/alltypesorc");
+    Configuration conf = new Configuration();
+    OrcEncodedDataReader.getOrcTailForPath(path, conf, null, conf, null);
   }
 
   private static final int INCOMPLETE = 0, DRL = 1;

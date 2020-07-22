@@ -28,25 +28,39 @@ import org.apache.hadoop.hive.cli.CliDriver;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.QTestSystemProperties;
 import org.apache.hadoop.hive.ql.QTestUtil;
+import org.apache.hadoop.hive.ql.processors.CommandProcessorException;
 import org.apache.hadoop.hive.ql.processors.CommandProcessorResponse;
+import org.apache.hadoop.hive.ql.qoption.QTestOptionHandler;
 import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class QTestDatasetHandler {
+/**
+ * Datasets are provided by this handler.
+ *
+ * An invocation of:
+ *
+ * <pre>
+ * --! qt:dataset:sample
+ * --! qt:dataset:sample:ONLY
+ * </pre>
+ *
+ * will make sure that the dataset named sample is loaded prior to executing the test.
+ */
+public class QTestDatasetHandler implements QTestOptionHandler {
   private static final Logger LOG = LoggerFactory.getLogger("QTestDatasetHandler");
 
   private File datasetDir;
-  private QTestUtil qt;
   private static Set<String> srcTables;
+  private static Set<String> missingTables = new HashSet<>();
+  Set<String> tablesToUnload = new HashSet<>();
 
-  public QTestDatasetHandler(QTestUtil qTestUtil, HiveConf conf) {
+  public QTestDatasetHandler(HiveConf conf) {
     // Use path relative to dataDir directory if it is not specified
     String dataDir = getDataDir(conf);
 
     datasetDir = conf.get("test.data.set.files") == null ? new File(dataDir + "/datasets")
       : new File(conf.get("test.data.set.files"));
-    this.qt = qTestUtil;
   }
 
   public String getDataDir(HiveConf conf) {
@@ -59,28 +73,6 @@ public class QTestDatasetHandler {
     return dataDir;
   }
 
-  public void initDataSetForTest(File file, CliDriver cliDriver) throws Exception {
-    synchronized (QTestUtil.class) {
-      DatasetParser parser = new DatasetParser();
-      parser.parse(file);
-
-      DatasetCollection datasets = parser.getDatasets();
-
-      Set<String> missingDatasets = datasets.getTables();
-      missingDatasets.removeAll(getSrcTables());
-      if (missingDatasets.isEmpty()) {
-        return;
-      }
-      qt.newSession(true);
-      for (String table : missingDatasets) {
-        if (initDataset(table, cliDriver)) {
-          addSrcTable(table);
-        }
-      }
-      qt.newSession(true);
-    }
-  }
-
   public boolean initDataset(String table, CliDriver cliDriver) throws Exception {
     File tableFile = new File(new File(datasetDir, table), Dataset.INIT_FILE_NAME);
     String commands = null;
@@ -90,10 +82,22 @@ public class QTestDatasetHandler {
       throw new RuntimeException(String.format("dataset file not found %s", tableFile), e);
     }
 
-    CommandProcessorResponse result = cliDriver.processLine(commands);
-    LOG.info("Result from cliDrriver.processLine in initFromDatasets=" + result);
-    if (result.getResponseCode() != 0) {
-      Assert.fail("Failed during initFromDatasets processLine with code=" + result);
+    try {
+      CommandProcessorResponse result = cliDriver.processLine(commands);
+      LOG.info("Result from cliDrriver.processLine in initFromDatasets=" + result);
+    } catch (CommandProcessorException e) {
+      Assert.fail("Failed during initFromDatasets processLine with code=" + e);
+    }
+
+    return true;
+  }
+
+  public boolean unloadDataset(String table, CliDriver cliDriver) throws Exception {
+    try {
+      CommandProcessorResponse result = cliDriver.processLine("drop table " + table);
+      LOG.info("Result from cliDrriver.processLine in initFromDatasets=" + result);
+    } catch (CommandProcessorException e) {
+      Assert.fail("Failed during initFromDatasets processLine with code=" + e);
     }
 
     return true;
@@ -108,6 +112,11 @@ public class QTestDatasetHandler {
 
   public static void addSrcTable(String table) {
     getSrcTables().add(table);
+    storeSrcTables();
+  }
+
+  private void removeSrcTable(String table) {
+    srcTables.remove(table);
     storeSrcTables();
   }
 
@@ -139,4 +148,65 @@ public class QTestDatasetHandler {
       }
     }
   }
+
+  @Override
+  public void processArguments(String arguments) {
+    String[] args = arguments.split(":");
+    Set<String> tableNames = getTableNames(args[0]);
+    synchronized (QTestUtil.class) {
+      if (args.length > 1) {
+        if (args.length > 2 || !args[1].equalsIgnoreCase("ONLY")) {
+          throw new RuntimeException("unknown option: " + args[1]);
+        }
+        tablesToUnload.addAll(getSrcTables());
+        tablesToUnload.removeAll(tableNames);
+      }
+      tableNames.removeAll(getSrcTables());
+      missingTables.addAll(tableNames);
+    }
+  }
+
+  private Set<String> getTableNames(String arguments) {
+    Set<String> ret = new HashSet<String>();
+    String[] tables = arguments.split(",");
+    for (String string : tables) {
+      string = string.trim();
+      if (string.length() == 0) {
+        continue;
+      }
+      ret.add(string);
+    }
+    return ret;
+  }
+
+  @Override
+  public void beforeTest(QTestUtil qt) throws Exception {
+    if (missingTables.isEmpty() && tablesToUnload.isEmpty()) {
+      return;
+    }
+    synchronized (QTestUtil.class) {
+      qt.newSession(true);
+      for (String table : missingTables) {
+        if (initDataset(table, qt.getCliDriver())) {
+          addSrcTable(table);
+        }
+      }
+      for (String table : tablesToUnload) {
+        removeSrcTable(table);
+        unloadDataset(table, qt.getCliDriver());
+      }
+      missingTables.clear();
+      tablesToUnload.clear();
+      qt.newSession(true);
+    }
+  }
+
+  @Override
+  public void afterTest(QTestUtil qt) throws Exception {
+  }
+
+  public DatasetCollection getDatasets() {
+    return new DatasetCollection(missingTables);
+  }
+
 }

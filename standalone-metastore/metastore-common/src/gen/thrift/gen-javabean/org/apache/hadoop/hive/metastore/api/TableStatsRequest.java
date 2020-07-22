@@ -43,6 +43,8 @@ import org.slf4j.LoggerFactory;
   private static final org.apache.thrift.protocol.TField COL_NAMES_FIELD_DESC = new org.apache.thrift.protocol.TField("colNames", org.apache.thrift.protocol.TType.LIST, (short)3);
   private static final org.apache.thrift.protocol.TField CAT_NAME_FIELD_DESC = new org.apache.thrift.protocol.TField("catName", org.apache.thrift.protocol.TType.STRING, (short)4);
   private static final org.apache.thrift.protocol.TField VALID_WRITE_ID_LIST_FIELD_DESC = new org.apache.thrift.protocol.TField("validWriteIdList", org.apache.thrift.protocol.TType.STRING, (short)5);
+  private static final org.apache.thrift.protocol.TField ENGINE_FIELD_DESC = new org.apache.thrift.protocol.TField("engine", org.apache.thrift.protocol.TType.STRING, (short)6);
+  private static final org.apache.thrift.protocol.TField ID_FIELD_DESC = new org.apache.thrift.protocol.TField("id", org.apache.thrift.protocol.TType.I64, (short)7);
 
   private static final Map<Class<? extends IScheme>, SchemeFactory> schemes = new HashMap<Class<? extends IScheme>, SchemeFactory>();
   static {
@@ -55,6 +57,8 @@ import org.slf4j.LoggerFactory;
   private List<String> colNames; // required
   private String catName; // optional
   private String validWriteIdList; // optional
+  private String engine; // required
+  private long id; // optional
 
   /** The set of fields this struct contains, along with convenience methods for finding and manipulating them. */
   public enum _Fields implements org.apache.thrift.TFieldIdEnum {
@@ -62,7 +66,9 @@ import org.slf4j.LoggerFactory;
     TBL_NAME((short)2, "tblName"),
     COL_NAMES((short)3, "colNames"),
     CAT_NAME((short)4, "catName"),
-    VALID_WRITE_ID_LIST((short)5, "validWriteIdList");
+    VALID_WRITE_ID_LIST((short)5, "validWriteIdList"),
+    ENGINE((short)6, "engine"),
+    ID((short)7, "id");
 
     private static final Map<String, _Fields> byName = new HashMap<String, _Fields>();
 
@@ -87,6 +93,10 @@ import org.slf4j.LoggerFactory;
           return CAT_NAME;
         case 5: // VALID_WRITE_ID_LIST
           return VALID_WRITE_ID_LIST;
+        case 6: // ENGINE
+          return ENGINE;
+        case 7: // ID
+          return ID;
         default:
           return null;
       }
@@ -127,7 +137,9 @@ import org.slf4j.LoggerFactory;
   }
 
   // isset id assignments
-  private static final _Fields optionals[] = {_Fields.CAT_NAME,_Fields.VALID_WRITE_ID_LIST};
+  private static final int __ID_ISSET_ID = 0;
+  private byte __isset_bitfield = 0;
+  private static final _Fields optionals[] = {_Fields.CAT_NAME,_Fields.VALID_WRITE_ID_LIST,_Fields.ID};
   public static final Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> metaDataMap;
   static {
     Map<_Fields, org.apache.thrift.meta_data.FieldMetaData> tmpMap = new EnumMap<_Fields, org.apache.thrift.meta_data.FieldMetaData>(_Fields.class);
@@ -142,28 +154,37 @@ import org.slf4j.LoggerFactory;
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
     tmpMap.put(_Fields.VALID_WRITE_ID_LIST, new org.apache.thrift.meta_data.FieldMetaData("validWriteIdList", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
         new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.ENGINE, new org.apache.thrift.meta_data.FieldMetaData("engine", org.apache.thrift.TFieldRequirementType.REQUIRED, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.STRING)));
+    tmpMap.put(_Fields.ID, new org.apache.thrift.meta_data.FieldMetaData("id", org.apache.thrift.TFieldRequirementType.OPTIONAL, 
+        new org.apache.thrift.meta_data.FieldValueMetaData(org.apache.thrift.protocol.TType.I64)));
     metaDataMap = Collections.unmodifiableMap(tmpMap);
     org.apache.thrift.meta_data.FieldMetaData.addStructMetaDataMap(TableStatsRequest.class, metaDataMap);
   }
 
   public TableStatsRequest() {
+    this.id = -1L;
+
   }
 
   public TableStatsRequest(
     String dbName,
     String tblName,
-    List<String> colNames)
+    List<String> colNames,
+    String engine)
   {
     this();
     this.dbName = dbName;
     this.tblName = tblName;
     this.colNames = colNames;
+    this.engine = engine;
   }
 
   /**
    * Performs a deep copy on <i>other</i>.
    */
   public TableStatsRequest(TableStatsRequest other) {
+    __isset_bitfield = other.__isset_bitfield;
     if (other.isSetDbName()) {
       this.dbName = other.dbName;
     }
@@ -180,6 +201,10 @@ import org.slf4j.LoggerFactory;
     if (other.isSetValidWriteIdList()) {
       this.validWriteIdList = other.validWriteIdList;
     }
+    if (other.isSetEngine()) {
+      this.engine = other.engine;
+    }
+    this.id = other.id;
   }
 
   public TableStatsRequest deepCopy() {
@@ -193,6 +218,9 @@ import org.slf4j.LoggerFactory;
     this.colNames = null;
     this.catName = null;
     this.validWriteIdList = null;
+    this.engine = null;
+    this.id = -1L;
+
   }
 
   public String getDbName() {
@@ -325,6 +353,51 @@ import org.slf4j.LoggerFactory;
     }
   }
 
+  public String getEngine() {
+    return this.engine;
+  }
+
+  public void setEngine(String engine) {
+    this.engine = engine;
+  }
+
+  public void unsetEngine() {
+    this.engine = null;
+  }
+
+  /** Returns true if field engine is set (has been assigned a value) and false otherwise */
+  public boolean isSetEngine() {
+    return this.engine != null;
+  }
+
+  public void setEngineIsSet(boolean value) {
+    if (!value) {
+      this.engine = null;
+    }
+  }
+
+  public long getId() {
+    return this.id;
+  }
+
+  public void setId(long id) {
+    this.id = id;
+    setIdIsSet(true);
+  }
+
+  public void unsetId() {
+    __isset_bitfield = EncodingUtils.clearBit(__isset_bitfield, __ID_ISSET_ID);
+  }
+
+  /** Returns true if field id is set (has been assigned a value) and false otherwise */
+  public boolean isSetId() {
+    return EncodingUtils.testBit(__isset_bitfield, __ID_ISSET_ID);
+  }
+
+  public void setIdIsSet(boolean value) {
+    __isset_bitfield = EncodingUtils.setBit(__isset_bitfield, __ID_ISSET_ID, value);
+  }
+
   public void setFieldValue(_Fields field, Object value) {
     switch (field) {
     case DB_NAME:
@@ -367,6 +440,22 @@ import org.slf4j.LoggerFactory;
       }
       break;
 
+    case ENGINE:
+      if (value == null) {
+        unsetEngine();
+      } else {
+        setEngine((String)value);
+      }
+      break;
+
+    case ID:
+      if (value == null) {
+        unsetId();
+      } else {
+        setId((Long)value);
+      }
+      break;
+
     }
   }
 
@@ -386,6 +475,12 @@ import org.slf4j.LoggerFactory;
 
     case VALID_WRITE_ID_LIST:
       return getValidWriteIdList();
+
+    case ENGINE:
+      return getEngine();
+
+    case ID:
+      return getId();
 
     }
     throw new IllegalStateException();
@@ -408,6 +503,10 @@ import org.slf4j.LoggerFactory;
       return isSetCatName();
     case VALID_WRITE_ID_LIST:
       return isSetValidWriteIdList();
+    case ENGINE:
+      return isSetEngine();
+    case ID:
+      return isSetId();
     }
     throw new IllegalStateException();
   }
@@ -470,6 +569,24 @@ import org.slf4j.LoggerFactory;
         return false;
     }
 
+    boolean this_present_engine = true && this.isSetEngine();
+    boolean that_present_engine = true && that.isSetEngine();
+    if (this_present_engine || that_present_engine) {
+      if (!(this_present_engine && that_present_engine))
+        return false;
+      if (!this.engine.equals(that.engine))
+        return false;
+    }
+
+    boolean this_present_id = true && this.isSetId();
+    boolean that_present_id = true && that.isSetId();
+    if (this_present_id || that_present_id) {
+      if (!(this_present_id && that_present_id))
+        return false;
+      if (this.id != that.id)
+        return false;
+    }
+
     return true;
   }
 
@@ -501,6 +618,16 @@ import org.slf4j.LoggerFactory;
     list.add(present_validWriteIdList);
     if (present_validWriteIdList)
       list.add(validWriteIdList);
+
+    boolean present_engine = true && (isSetEngine());
+    list.add(present_engine);
+    if (present_engine)
+      list.add(engine);
+
+    boolean present_id = true && (isSetId());
+    list.add(present_id);
+    if (present_id)
+      list.add(id);
 
     return list.hashCode();
   }
@@ -559,6 +686,26 @@ import org.slf4j.LoggerFactory;
     }
     if (isSetValidWriteIdList()) {
       lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.validWriteIdList, other.validWriteIdList);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = Boolean.valueOf(isSetEngine()).compareTo(other.isSetEngine());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetEngine()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.engine, other.engine);
+      if (lastComparison != 0) {
+        return lastComparison;
+      }
+    }
+    lastComparison = Boolean.valueOf(isSetId()).compareTo(other.isSetId());
+    if (lastComparison != 0) {
+      return lastComparison;
+    }
+    if (isSetId()) {
+      lastComparison = org.apache.thrift.TBaseHelper.compareTo(this.id, other.id);
       if (lastComparison != 0) {
         return lastComparison;
       }
@@ -626,6 +773,20 @@ import org.slf4j.LoggerFactory;
       }
       first = false;
     }
+    if (!first) sb.append(", ");
+    sb.append("engine:");
+    if (this.engine == null) {
+      sb.append("null");
+    } else {
+      sb.append(this.engine);
+    }
+    first = false;
+    if (isSetId()) {
+      if (!first) sb.append(", ");
+      sb.append("id:");
+      sb.append(this.id);
+      first = false;
+    }
     sb.append(")");
     return sb.toString();
   }
@@ -644,6 +805,10 @@ import org.slf4j.LoggerFactory;
       throw new org.apache.thrift.protocol.TProtocolException("Required field 'colNames' is unset! Struct:" + toString());
     }
 
+    if (!isSetEngine()) {
+      throw new org.apache.thrift.protocol.TProtocolException("Required field 'engine' is unset! Struct:" + toString());
+    }
+
     // check for sub-struct validity
   }
 
@@ -657,6 +822,8 @@ import org.slf4j.LoggerFactory;
 
   private void readObject(java.io.ObjectInputStream in) throws java.io.IOException, ClassNotFoundException {
     try {
+      // it doesn't seem like you should have to do this, but java serialization is wacky, and doesn't call the default constructor.
+      __isset_bitfield = 0;
       read(new org.apache.thrift.protocol.TCompactProtocol(new org.apache.thrift.transport.TIOStreamTransport(in)));
     } catch (org.apache.thrift.TException te) {
       throw new java.io.IOException(te);
@@ -700,13 +867,13 @@ import org.slf4j.LoggerFactory;
           case 3: // COL_NAMES
             if (schemeField.type == org.apache.thrift.protocol.TType.LIST) {
               {
-                org.apache.thrift.protocol.TList _list466 = iprot.readListBegin();
-                struct.colNames = new ArrayList<String>(_list466.size);
-                String _elem467;
-                for (int _i468 = 0; _i468 < _list466.size; ++_i468)
+                org.apache.thrift.protocol.TList _list490 = iprot.readListBegin();
+                struct.colNames = new ArrayList<String>(_list490.size);
+                String _elem491;
+                for (int _i492 = 0; _i492 < _list490.size; ++_i492)
                 {
-                  _elem467 = iprot.readString();
-                  struct.colNames.add(_elem467);
+                  _elem491 = iprot.readString();
+                  struct.colNames.add(_elem491);
                 }
                 iprot.readListEnd();
               }
@@ -727,6 +894,22 @@ import org.slf4j.LoggerFactory;
             if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
               struct.validWriteIdList = iprot.readString();
               struct.setValidWriteIdListIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
+          case 6: // ENGINE
+            if (schemeField.type == org.apache.thrift.protocol.TType.STRING) {
+              struct.engine = iprot.readString();
+              struct.setEngineIsSet(true);
+            } else { 
+              org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
+            }
+            break;
+          case 7: // ID
+            if (schemeField.type == org.apache.thrift.protocol.TType.I64) {
+              struct.id = iprot.readI64();
+              struct.setIdIsSet(true);
             } else { 
               org.apache.thrift.protocol.TProtocolUtil.skip(iprot, schemeField.type);
             }
@@ -758,9 +941,9 @@ import org.slf4j.LoggerFactory;
         oprot.writeFieldBegin(COL_NAMES_FIELD_DESC);
         {
           oprot.writeListBegin(new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, struct.colNames.size()));
-          for (String _iter469 : struct.colNames)
+          for (String _iter493 : struct.colNames)
           {
-            oprot.writeString(_iter469);
+            oprot.writeString(_iter493);
           }
           oprot.writeListEnd();
         }
@@ -779,6 +962,16 @@ import org.slf4j.LoggerFactory;
           oprot.writeString(struct.validWriteIdList);
           oprot.writeFieldEnd();
         }
+      }
+      if (struct.engine != null) {
+        oprot.writeFieldBegin(ENGINE_FIELD_DESC);
+        oprot.writeString(struct.engine);
+        oprot.writeFieldEnd();
+      }
+      if (struct.isSetId()) {
+        oprot.writeFieldBegin(ID_FIELD_DESC);
+        oprot.writeI64(struct.id);
+        oprot.writeFieldEnd();
       }
       oprot.writeFieldStop();
       oprot.writeStructEnd();
@@ -801,11 +994,12 @@ import org.slf4j.LoggerFactory;
       oprot.writeString(struct.tblName);
       {
         oprot.writeI32(struct.colNames.size());
-        for (String _iter470 : struct.colNames)
+        for (String _iter494 : struct.colNames)
         {
-          oprot.writeString(_iter470);
+          oprot.writeString(_iter494);
         }
       }
+      oprot.writeString(struct.engine);
       BitSet optionals = new BitSet();
       if (struct.isSetCatName()) {
         optionals.set(0);
@@ -813,12 +1007,18 @@ import org.slf4j.LoggerFactory;
       if (struct.isSetValidWriteIdList()) {
         optionals.set(1);
       }
-      oprot.writeBitSet(optionals, 2);
+      if (struct.isSetId()) {
+        optionals.set(2);
+      }
+      oprot.writeBitSet(optionals, 3);
       if (struct.isSetCatName()) {
         oprot.writeString(struct.catName);
       }
       if (struct.isSetValidWriteIdList()) {
         oprot.writeString(struct.validWriteIdList);
+      }
+      if (struct.isSetId()) {
+        oprot.writeI64(struct.id);
       }
     }
 
@@ -830,17 +1030,19 @@ import org.slf4j.LoggerFactory;
       struct.tblName = iprot.readString();
       struct.setTblNameIsSet(true);
       {
-        org.apache.thrift.protocol.TList _list471 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
-        struct.colNames = new ArrayList<String>(_list471.size);
-        String _elem472;
-        for (int _i473 = 0; _i473 < _list471.size; ++_i473)
+        org.apache.thrift.protocol.TList _list495 = new org.apache.thrift.protocol.TList(org.apache.thrift.protocol.TType.STRING, iprot.readI32());
+        struct.colNames = new ArrayList<String>(_list495.size);
+        String _elem496;
+        for (int _i497 = 0; _i497 < _list495.size; ++_i497)
         {
-          _elem472 = iprot.readString();
-          struct.colNames.add(_elem472);
+          _elem496 = iprot.readString();
+          struct.colNames.add(_elem496);
         }
       }
       struct.setColNamesIsSet(true);
-      BitSet incoming = iprot.readBitSet(2);
+      struct.engine = iprot.readString();
+      struct.setEngineIsSet(true);
+      BitSet incoming = iprot.readBitSet(3);
       if (incoming.get(0)) {
         struct.catName = iprot.readString();
         struct.setCatNameIsSet(true);
@@ -848,6 +1050,10 @@ import org.slf4j.LoggerFactory;
       if (incoming.get(1)) {
         struct.validWriteIdList = iprot.readString();
         struct.setValidWriteIdListIsSet(true);
+      }
+      if (incoming.get(2)) {
+        struct.id = iprot.readI64();
+        struct.setIdIsSet(true);
       }
     }
   }

@@ -20,7 +20,7 @@ package org.apache.hadoop.hive.common.log;
 import com.google.common.base.Function;
 import com.google.common.collect.Lists;
 import jline.TerminalFactory;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.fusesource.jansi.Ansi;
 
@@ -159,9 +159,8 @@ public class InPlaceUpdate {
 
     // Map 1 .......... container  SUCCEEDED      7          7        0        0       0       0
     List<String> printReady = Lists.transform(monitor.rows(), new Function<List<String>, String>() {
-      @Nullable
       @Override
-      public String apply(@Nullable List<String> row) {
+      public String apply(List<String> row) {
         return String.format(VERTEX_FORMAT, row.toArray());
       }
     });

@@ -35,6 +35,7 @@ STAGE PLANS:
                       Statistics: Num rows: 250 Data size: 44500 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: zz
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 250 Data size: 44500 Basic stats: COMPLETE Column stats: COMPLETE
@@ -733,6 +734,7 @@ STAGE PLANS:
                       Statistics: Num rows: 83 Data size: 14774 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: zz
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 83 Data size: 14774 Basic stats: COMPLETE Column stats: COMPLETE
@@ -967,6 +969,7 @@ STAGE PLANS:
                       Statistics: Num rows: 262 Data size: 46636 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: zz
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 262 Data size: 46636 Basic stats: COMPLETE Column stats: COMPLETE
@@ -989,6 +992,7 @@ STAGE PLANS:
                       Statistics: Num rows: 262 Data size: 46636 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: zz
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 262 Data size: 46636 Basic stats: COMPLETE Column stats: COMPLETE
@@ -1368,15 +1372,15 @@ POSTHOOK: Input: default@src
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@sdi
 STAGE DEPENDENCIES:
-  Stage-1 is a root stage
+  Stage-0 is a root stage
 
 STAGE PLANS:
-  Stage: Stage-1
+  Stage: Stage-0
     Create View
-      columns: key string, value string
       expanded text: select distinct `src`.`key`, `src`.`value` from `default`.`src` order by `src`.`key` limit 2
-      name: default.sdi
       original text: select distinct * from src order by key limit 2
+      columns: key string, value string
+      name: default.sdi
 
 PREHOOK: query: create view sdi as select distinct * from src order by key limit 2
 PREHOOK: type: CREATEVIEW
@@ -2516,6 +2520,7 @@ STAGE PLANS:
                       Statistics: Num rows: 250 Data size: 44500 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: zz
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 250 Data size: 44500 Basic stats: COMPLETE Column stats: COMPLETE
@@ -3214,6 +3219,7 @@ STAGE PLANS:
                       Statistics: Num rows: 83 Data size: 14774 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: zz
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 83 Data size: 14774 Basic stats: COMPLETE Column stats: COMPLETE
@@ -3448,6 +3454,7 @@ STAGE PLANS:
                       Statistics: Num rows: 262 Data size: 46636 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: zz
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 262 Data size: 46636 Basic stats: COMPLETE Column stats: COMPLETE
@@ -3470,6 +3477,7 @@ STAGE PLANS:
                       Statistics: Num rows: 262 Data size: 46636 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: string), _col1 (type: string)
+                        null sort order: zz
                         sort order: ++
                         Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
                         Statistics: Num rows: 262 Data size: 46636 Basic stats: COMPLETE Column stats: COMPLETE
@@ -3853,15 +3861,15 @@ POSTHOOK: Input: default@src
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@sdi
 STAGE DEPENDENCIES:
-  Stage-1 is a root stage
+  Stage-0 is a root stage
 
 STAGE PLANS:
-  Stage: Stage-1
+  Stage: Stage-0
     Create View
-      columns: key string, value string
       expanded text: select distinct `src`.`key`, `src`.`value` from `default`.`src` order by `src`.`key` limit 2
-      name: default.sdi
       original text: select distinct * from src order by key limit 2
+      columns: key string, value string
+      name: default.sdi
 
 PREHOOK: query: create view sdi as select distinct * from src order by key limit 2
 PREHOOK: type: CREATEVIEW

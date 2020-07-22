@@ -131,6 +131,7 @@ STAGE PLANS:
                 TableScan
                   alias: t1
                   filterExpr: bin is not null (type: boolean)
+                  probeDecodeDetails: cacheKey:HASH_MAP_MAPJOIN_30_container, bigKeyColName:bin, smallTablePos:1, keyRatio:0.0
                   Statistics: Num rows: 100 Data size: 34084 Basic stats: COMPLETE Column stats: COMPLETE
                   TableScan Vectorization:
                       native: true
@@ -182,11 +183,12 @@ STAGE PLANS:
                                 native: false
                                 vectorProcessingMode: HASH
                                 projectedOutputColumnNums: [0]
-                            minReductionHashAggr: 0.0
+                            minReductionHashAggr: 0.99
                             mode: hash
                             outputColumnNames: _col0
                             Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                             Reduce Output Operator
+                              null sort order: 
                               sort order: 
                               Reduce Sink Vectorization:
                                   className: VectorReduceSinkEmptyKeyOperator
@@ -230,6 +232,7 @@ STAGE PLANS:
                       Statistics: Num rows: 100 Data size: 34084 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col10 (type: binary)
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col10 (type: binary)
                         Reduce Sink Vectorization:
@@ -365,6 +368,7 @@ STAGE PLANS:
                       Statistics: Num rows: 50 Data size: 3200 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: binary)
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: binary)
                         Reduce Sink Vectorization:
@@ -417,6 +421,7 @@ STAGE PLANS:
                   Statistics: Num rows: 25 Data size: 1600 Basic stats: COMPLETE Column stats: COMPLETE
                   Reduce Output Operator
                     key expressions: _col1 (type: binary)
+                    null sort order: z
                     sort order: +
                     Reduce Sink Vectorization:
                         className: VectorReduceSinkObjectHashOperator
@@ -531,6 +536,7 @@ STAGE PLANS:
                 TableScan
                   alias: t1
                   filterExpr: i is not null (type: boolean)
+                  probeDecodeDetails: cacheKey:HASH_MAP_MAPJOIN_25_container, bigKeyColName:i, smallTablePos:1, keyRatio:0.8
                   Statistics: Num rows: 100 Data size: 6000 Basic stats: COMPLETE Column stats: COMPLETE
                   TableScan Vectorization:
                       native: true
@@ -618,6 +624,7 @@ STAGE PLANS:
                       Statistics: Num rows: 100 Data size: 6000 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: int)
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: int)
                         Reduce Sink Vectorization:

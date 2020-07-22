@@ -38,6 +38,7 @@ import org.apache.hadoop.hive.common.io.Allocator;
 import org.apache.hadoop.hive.common.io.DataCache.BooleanRef;
 import org.apache.hadoop.hive.common.io.DataCache.DiskRangeListFactory;
 import org.apache.hadoop.hive.common.io.encoded.MemoryBuffer;
+import org.apache.hadoop.hive.common.io.CacheTag;
 import org.apache.hadoop.hive.llap.DebugUtils;
 import org.apache.hadoop.hive.llap.cache.LowLevelCache.Priority;
 import org.apache.hadoop.hive.llap.io.api.impl.LlapIoImpl;
@@ -73,19 +74,12 @@ public class SerDeLowLevelCacheImpl implements BufferUsageManager, LlapIoDebugDu
                     ReadWriteLockMetrics.createLockMetricsSource("FileData"));
   }
 
-  public static final class LlapSerDeDataBuffer extends LlapAllocatorBuffer {
+  public static final class LlapSerDeDataBuffer extends BaseLlapDataBuffer {
     public boolean isCached = false;
-    private String tag;
+
     @Override
     public void notifyEvicted(EvictionDispatcher evictionDispatcher) {
       evictionDispatcher.notifyEvicted(this);
-    }
-    public void setTag(String tag) {
-      this.tag = tag;
-    }
-    @Override
-    public String getTag() {
-      return tag;
     }
   }
 
@@ -523,7 +517,7 @@ public class SerDeLowLevelCacheImpl implements BufferUsageManager, LlapIoDebugDu
   }
 
   public void putFileData(final FileData data, Priority priority,
-      LowLevelCacheCounters qfCounters, String tag) {
+      LowLevelCacheCounters qfCounters, CacheTag tag) {
     // TODO: buffers are accounted for at allocation time, but ideally we should report the memory
     //       overhead from the java objects to memory manager and remove it when discarding file.
     if (data.stripes == null || data.stripes.isEmpty()) {
@@ -540,7 +534,7 @@ public class SerDeLowLevelCacheImpl implements BufferUsageManager, LlapIoDebugDu
         public FileData apply(Void input) {
           return data; // If we don't have a file cache, we will add this one as is.
         }
-      });
+      }, tag);
       cached = subCache.getCache();
     } finally {
       if (data != cached) {
@@ -553,7 +547,7 @@ public class SerDeLowLevelCacheImpl implements BufferUsageManager, LlapIoDebugDu
       }
       try {
         for (StripeData si : data.stripes) {
-          lockAllBuffersForPut(si, priority, tag);
+          lockAllBuffersForPut(si, priority, subCache);
         }
         if (data == cached) {
           if (LlapIoImpl.CACHE_LOGGER.isTraceEnabled()) {
@@ -598,7 +592,7 @@ public class SerDeLowLevelCacheImpl implements BufferUsageManager, LlapIoDebugDu
     }
   }
 
-  private void lockAllBuffersForPut(StripeData si, Priority priority, String tag) {
+  private void lockAllBuffersForPut(StripeData si, Priority priority, FileCache cache) {
     for (int i = 0; i < si.data.length; ++i) {
       LlapSerDeDataBuffer[][] colData = si.data[i];
       if (colData == null) continue;
@@ -608,7 +602,7 @@ public class SerDeLowLevelCacheImpl implements BufferUsageManager, LlapIoDebugDu
         for (int k = 0; k < streamData.length; ++k) {
           boolean canLock = lockBuffer(streamData[k], false); // false - not in cache yet
           assert canLock;
-          streamData[k].setTag(tag);
+          streamData[k].setFileCache(cache);
           cachePolicy.cache(streamData[k], priority);
           streamData[k].isCached = true;
         }
@@ -769,7 +763,6 @@ public class SerDeLowLevelCacheImpl implements BufferUsageManager, LlapIoDebugDu
       try {
         FileData fd = e.getValue().getCache();
         int fileLocked = 0, fileUnlocked = 0, fileEvicted = 0, fileMoving = 0;
-        sb.append(fd.colCount).append(" columns, ").append(fd.stripes.size()).append(" stripes; ");
         for (StripeData stripe : fd.stripes) {
           if (stripe.data == null) continue;
           for (int i = 0; i < stripe.data.length; ++i) {
@@ -806,7 +799,8 @@ public class SerDeLowLevelCacheImpl implements BufferUsageManager, LlapIoDebugDu
         allEvicted += fileEvicted;
         allMoving += fileMoving;
         sb.append("\n  file " + e.getKey() + ": " + fileLocked + " locked, " + fileUnlocked
-            + " unlocked, " + fileEvicted + " evicted, " + fileMoving + " being moved");
+            + " unlocked, " + fileEvicted + " evicted, " + fileMoving + " being moved; ");
+        sb.append(fd.colCount).append(" columns, ").append(fd.stripes.size()).append(" stripes");
       } finally {
         e.getValue().decRef();
       }

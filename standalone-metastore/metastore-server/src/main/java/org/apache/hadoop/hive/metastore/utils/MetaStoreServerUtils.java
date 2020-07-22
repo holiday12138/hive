@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +57,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.beanutils.PropertyUtils;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.ListUtils;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.Path;
@@ -112,6 +113,8 @@ public class MetaStoreServerUtils {
   private static final Charset ENCODING = StandardCharsets.UTF_8;
   private static final Logger LOG = LoggerFactory.getLogger(MetaStoreServerUtils.class);
 
+  public static final String JUNIT_DATABASE_PREFIX = "junit_metastore_db";
+
   /**
    * Helper function to transform Nulls to empty strings.
    */
@@ -119,7 +122,7 @@ public class MetaStoreServerUtils {
       = new com.google.common.base.Function<String, String>() {
     @Override
     public String apply(@Nullable String string) {
-      return org.apache.commons.lang.StringUtils.defaultString(string);
+      return org.apache.commons.lang3.StringUtils.defaultString(string);
     }
   };
 
@@ -179,7 +182,7 @@ public class MetaStoreServerUtils {
     if (colStatsMap.size() < 1) {
       LOG.debug("No stats data found for: tblName= {}, partNames= {}, colNames= {}",
           TableName.getQualified(catName, dbName, tableName), partNames, colNames);
-      return new ArrayList<ColumnStatisticsObj>();
+      return Collections.emptyList();
     }
     return aggrPartitionStats(colStatsMap, partNames, areAllPartsFound,
         useDensityFunctionForNDVEstimation, ndvTuner);
@@ -338,7 +341,7 @@ public class MetaStoreServerUtils {
         SortedSet<String> sortedOuterList = new TreeSet<>();
         for (List<String> innerList : skewed.getSkewedColValues()) {
           SortedSet<String> sortedInnerList = new TreeSet<>(innerList);
-          sortedOuterList.add(org.apache.commons.lang.StringUtils.join(sortedInnerList, "."));
+          sortedOuterList.add(org.apache.commons.lang3.StringUtils.join(sortedInnerList, "."));
         }
         for (String colval : sortedOuterList) {
           md.update(colval.getBytes(ENCODING));
@@ -348,7 +351,7 @@ public class MetaStoreServerUtils {
         SortedMap<String, String> sortedMap = new TreeMap<>();
         for (Map.Entry<List<String>, String> smap : skewed.getSkewedColValueLocationMaps().entrySet()) {
           SortedSet<String> sortedKey = new TreeSet<>(smap.getKey());
-          sortedMap.put(org.apache.commons.lang.StringUtils.join(sortedKey, "."), smap.getValue());
+          sortedMap.put(org.apache.commons.lang3.StringUtils.join(sortedKey, "."), smap.getValue());
         }
         for (Map.Entry<String, String> e : sortedMap.entrySet()) {
           md.update(e.getKey().getBytes(ENCODING));
@@ -557,11 +560,11 @@ public class MetaStoreServerUtils {
     if (!madeDir) {
       // The partition location already existed and may contain data. Lets try to
       // populate those statistics that don't require a full scan of the data.
-      LOG.warn("Updating partition stats fast for: " + part.getTableName());
+      LOG.info("Updating partition stats fast for: {}", part.getTableName());
       List<FileStatus> fileStatus = wh.getFileStatusesForLocation(part.getLocation());
       // TODO: this is invalid for ACID tables, and we cannot access AcidUtils here.
       populateQuickStats(fileStatus, params);
-      LOG.warn("Updated size to " + params.get(StatsSetupConst.TOTAL_SIZE));
+      LOG.info("Updated size to {}", params.get(StatsSetupConst.TOTAL_SIZE));
       updateBasicState(environmentContext, params);
     }
     part.setParameters(params);
@@ -1014,6 +1017,21 @@ public class MetaStoreServerUtils {
           if (input.getSd() == null) {
             return StorageDescriptorKey.UNSET_KEY;
           }
+
+          // if sd has skewed columns we better not group partition, since different partitions
+          // could have different skewed info like skewed location
+          if (input.getSd().getSkewedInfo() != null
+              && input.getSd().getSkewedInfo().getSkewedColNames() != null
+              && !input.getSd().getSkewedInfo().getSkewedColNames().isEmpty()) {
+            return new StorageDescriptorKey(input.getSd());
+          }
+
+          // if partitions don't have the same number of buckets we can not group their SD,
+          // this could lead to incorrect number of buckets
+          if (input.getSd().getNumBuckets()
+              != partitions.iterator().next().getSd().getNumBuckets()) {
+            return new StorageDescriptorKey(input.getSd());
+          }
           // if the partition is within table, use the tableSDKey to group it with other partitions
           // within the table directory
           if (input.getSd().getLocation() != null && input.getSd().getLocation()
@@ -1330,6 +1348,17 @@ public class MetaStoreServerUtils {
     }
   }
 
+  public static void getPartitionListByFilterExp(IMetaStoreClient msc, Table table, byte[] filterExp,
+                                                 String defaultPartName, List<Partition> results)
+      throws MetastoreException {
+    try {
+      msc.listPartitionsByExpr(table.getCatName(), table.getDbName(), table.getTableName(), filterExp,
+          defaultPartName, (short) -1, results);
+    } catch (Exception e) {
+      throw new MetastoreException(e);
+    }
+  }
+
   public static boolean isPartitioned(Table table) {
     if (getPartCols(table) == null) {
       return false;
@@ -1431,12 +1460,16 @@ public class MetaStoreServerUtils {
           return result;
         }
 
-        String partitionName = parts[0];
+        // Since hive stores partitions keys in lower case, if the hdfs path contains mixed case,
+        // it should be converted to lower case
+        String partitionName = parts[0].toLowerCase();
+        // Do not convert the partitionValue to lowercase
+        String partitionValue = parts[1];
         if (partCols.contains(partitionName)) {
           if (result == null) {
-            result = currPath.getName();
+            result = partitionName + "=" + partitionValue;
           } else {
-            result = currPath.getName() + Path.SEPARATOR + result;
+            result = partitionName + "=" + partitionValue + Path.SEPARATOR + result;
           }
         }
       }

@@ -25,10 +25,12 @@ import java.io.File;
 import org.apache.hadoop.hive.ql.QTestArguments;
 import org.apache.hadoop.hive.ql.QTestProcessExecResult;
 import org.apache.hadoop.hive.ql.QTestUtil;
+import org.apache.hadoop.hive.ql.processors.CommandProcessorException;
 import org.apache.hadoop.hive.ql.QTestMiniClusters.MiniClusterType;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.internal.AssumptionViolatedException;
 
 import com.google.common.base.Strings;
 
@@ -58,11 +60,6 @@ public class CoreNegativeCliDriver extends CliAdapter{
             .withCleanupScript(cleanupScript)
             .withLlapIo(false)
             .build());
-      // do a one time initialization
-      qt.newSession();
-      qt.cleanUp();
-      qt.createSources();
-
     } catch (Exception e) {
       System.err.println("Exception: " + e.getMessage());
       e.printStackTrace();
@@ -114,6 +111,11 @@ public class CoreNegativeCliDriver extends CliAdapter{
   }
 
   @Override
+  protected QTestUtil getQt() {
+    return qt;
+  }
+
+  @Override
   public void runTest(String tname, String fname, String fpath) throws Exception {
     long startTime = System.currentTimeMillis();
     try {
@@ -122,9 +124,11 @@ public class CoreNegativeCliDriver extends CliAdapter{
       qt.addFile(fpath);
       qt.cliInit(new File(fpath));
 
-      int ecode = qt.executeClient(fname).getResponseCode();
-      if (ecode == 0) {
+      try {
+        qt.executeClient(fname);
         qt.failed(fname, QTestUtil.DEBUG_HINT);
+      } catch (CommandProcessorException e) {
+        // this is the expected outcome
       }
 
       QTestProcessExecResult result = qt.checkCliDriverResults(fname);
@@ -133,6 +137,8 @@ public class CoreNegativeCliDriver extends CliAdapter{
           : "\r\n" + result.getCapturedOutput();
         qt.failedDiff(result.getReturnCode(), fname, message);
       }
+    } catch (AssumptionViolatedException e) {
+      throw e;
     } catch (Error error) {
       QTestProcessExecResult qTestProcessExecResult = qt.checkNegativeResults(fname, error);
       if (qTestProcessExecResult.getReturnCode() != 0) {

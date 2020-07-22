@@ -19,7 +19,7 @@ package org.apache.hadoop.hive.ql.exec.repl.bootstrap.events.filesystem;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.ddl.table.partition.AlterTableAddPartitionDesc;
+import org.apache.hadoop.hive.ql.ddl.table.partition.add.AlterTableAddPartitionDesc;
 import org.apache.hadoop.hive.ql.exec.repl.bootstrap.events.PartitionEvent;
 import org.apache.hadoop.hive.ql.exec.repl.bootstrap.events.TableEvent;
 import org.apache.hadoop.hive.ql.exec.repl.bootstrap.load.ReplicationState;
@@ -34,9 +34,9 @@ public class FSPartitionEvent implements PartitionEvent {
   private final ReplicationState replicationState;
   private final TableEvent tableEvent;
 
-  FSPartitionEvent(HiveConf hiveConf, String metadataDir,
+  FSPartitionEvent(HiveConf hiveConf, String metadataDir, String dataDir,
       ReplicationState replicationState) {
-    tableEvent = new FSTableEvent(hiveConf, metadataDir);
+    tableEvent = new FSTableEvent(hiveConf, metadataDir, dataDir);
     this.replicationState = replicationState;
   }
 
@@ -86,5 +86,10 @@ public class FSPartitionEvent implements PartitionEvent {
   @Override
   public Path metadataPath() {
     return tableEvent.metadataPath();
+  }
+
+  @Override
+  public Path dataPath() {
+    return tableEvent.dataPath();
   }
 }

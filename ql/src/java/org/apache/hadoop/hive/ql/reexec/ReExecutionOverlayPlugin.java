@@ -26,6 +26,8 @@ import org.apache.hadoop.hive.ql.hooks.ExecuteWithHookContext;
 import org.apache.hadoop.hive.ql.hooks.HookContext;
 import org.apache.hadoop.hive.ql.hooks.HookContext.HookType;
 import org.apache.hadoop.hive.ql.plan.mapper.PlanMapper;
+import org.apache.hadoop.hive.ql.processors.CommandProcessorException;
+import org.apache.tez.dag.api.TezConfiguration;
 
 /**
  * Re-Executes a query only adding an extra overlay
@@ -55,6 +57,12 @@ public class ReExecutionOverlayPlugin implements IReExecutionPlugin {
     this.driver = driver;
     driver.getHookRunner().addOnFailureHook(new LocalHook());
     HiveConf conf = driver.getConf();
+    // we unset the queue name intentionally in TezSessionState#startSessionAndContainers
+    // as a result reexec create new session in the default queue and create problem
+    String queueName = conf.get(TezConfiguration.TEZ_QUEUE_NAME);
+    if (queueName != null) {
+      conf.set("reexec.overlay.tez.queue.name", queueName);
+    }
     subtree = conf.subtree("reexec.overlay");
   }
 
@@ -67,7 +75,8 @@ public class ReExecutionOverlayPlugin implements IReExecutionPlugin {
   }
 
   @Override
-  public boolean shouldReExecute(int executionNum) {
+  public boolean shouldReExecute(int executionNum, CommandProcessorException ex) {
+
     return executionNum == 1 && !subtree.isEmpty() && retryPossible;
   }
 

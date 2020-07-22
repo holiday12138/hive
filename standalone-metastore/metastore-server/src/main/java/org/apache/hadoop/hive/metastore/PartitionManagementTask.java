@@ -21,6 +21,7 @@ package org.apache.hadoop.hive.metastore;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -30,6 +31,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.common.repl.ReplConst;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.metastore.api.TableMeta;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
@@ -80,6 +82,16 @@ public class PartitionManagementTask implements MetastoreTaskThread {
     return conf;
   }
 
+  private static boolean partitionDiscoveryEnabled(Map<String, String> params) {
+    return params != null && params.containsKey(DISCOVER_PARTITIONS_TBLPROPERTY) &&
+            params.get(DISCOVER_PARTITIONS_TBLPROPERTY).equalsIgnoreCase("true");
+  }
+
+  private static boolean tblBeingReplicatedInto(Map<String, String> params) {
+    return params != null && params.containsKey(ReplConst.REPL_TARGET_TABLE_PROPERTY) &&
+            !params.get(ReplConst.REPL_TARGET_TABLE_PROPERTY).trim().isEmpty();
+  }
+
   @Override
   public void run() {
     if (lock.tryLock()) {
@@ -116,8 +128,7 @@ public class PartitionManagementTask implements MetastoreTaskThread {
 
         for (TableMeta tableMeta : foundTableMetas) {
           Table table = msc.getTable(tableMeta.getCatName(), tableMeta.getDbName(), tableMeta.getTableName());
-          if (table.getParameters() != null && table.getParameters().containsKey(DISCOVER_PARTITIONS_TBLPROPERTY) &&
-            table.getParameters().get(DISCOVER_PARTITIONS_TBLPROPERTY).equalsIgnoreCase("true")) {
+          if (partitionDiscoveryEnabled(table.getParameters()) && !tblBeingReplicatedInto(table.getParameters())) {
             candidateTables.add(table);
           }
         }
@@ -135,7 +146,8 @@ public class PartitionManagementTask implements MetastoreTaskThread {
             new ThreadFactoryBuilder().setDaemon(true).setNameFormat("PartitionDiscoveryTask-%d").build());
         CountDownLatch countDownLatch = new CountDownLatch(candidateTables.size());
         LOG.info("Found {} candidate tables for partition discovery", candidateTables.size());
-        setupMsckConf();
+        setupMsckPathInvalidation();
+        Configuration msckConf = Msck.getMsckConf(conf);
         for (Table table : candidateTables) {
           qualifiedTableName = Warehouse.getCatalogQualifiedTableName(table);
           long retentionSeconds = getRetentionPeriodInSeconds(table);
@@ -144,7 +156,7 @@ public class PartitionManagementTask implements MetastoreTaskThread {
           // this always runs in 'sync' mode where partitions can be added and dropped
           MsckInfo msckInfo = new MsckInfo(table.getCatName(), table.getDbName(), table.getTableName(),
             null, null, true, true, true, retentionSeconds);
-          executorService.submit(new MsckThread(msckInfo, conf, qualifiedTableName, countDownLatch));
+          executorService.submit(new MsckThread(msckInfo, msckConf, qualifiedTableName, countDownLatch));
         }
         countDownLatch.await();
         executorService.shutdownNow();
@@ -163,7 +175,7 @@ public class PartitionManagementTask implements MetastoreTaskThread {
     }
   }
 
-  static long getRetentionPeriodInSeconds(final Table table) {
+  public static long getRetentionPeriodInSeconds(final Table table) {
     String retentionPeriod;
     long retentionSeconds = -1;
     if (table.getParameters() != null && table.getParameters().containsKey(PARTITION_RETENTION_PERIOD_TBLPROPERTY)) {
@@ -185,7 +197,7 @@ public class PartitionManagementTask implements MetastoreTaskThread {
     return retentionSeconds;
   }
 
-  private void setupMsckConf() {
+  private void setupMsckPathInvalidation() {
     // if invalid partition directory appears, we just skip and move on. We don't want partition management to throw
     // when invalid path is encountered as these are background threads. We just want to skip and move on. Users will
     // have to fix the invalid paths via external means.

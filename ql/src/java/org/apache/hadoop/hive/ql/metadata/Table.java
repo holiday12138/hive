@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -40,6 +41,7 @@ import org.apache.hadoop.hive.common.StatsSetupConst;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreUtils;
+import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
 import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.Warehouse;
 import org.apache.hadoop.hive.metastore.api.ColumnStatistics;
@@ -103,6 +105,7 @@ public class Table implements Serializable {
   private Path path;
 
   private transient HiveStorageHandler storageHandler;
+  private transient StorageHandlerInfo storageHandlerInfo;
 
   private transient TableSpec tableSpec;
 
@@ -111,6 +114,24 @@ public class Table implements Serializable {
   /** Note: This is set only for describe table purposes, it cannot be used to verify whether
    * a materialization is up-to-date or not. */
   private transient Boolean outdatedForRewritingMaterializedView;
+
+  /** Constraint related objects */
+  private transient PrimaryKeyInfo pki;
+  private transient ForeignKeyInfo fki;
+  private transient UniqueConstraint uki;
+  private transient NotNullConstraint nnc;
+  private transient DefaultConstraint dc;
+  private transient CheckConstraint cc;
+
+  /** Constraint related flags
+   *  This is to track if constraints are retrieved from metastore or not
+   */
+  private transient boolean isPKFetched=false;
+  private transient boolean isFKFetched=false;
+  private transient boolean isUniqueFetched=false;
+  private transient boolean isNotNullFetched=false;
+  private transient boolean isDefaultFetched=false;
+  private transient boolean isCheckFetched=false;
 
   /**
    * Used only for serialization.
@@ -138,6 +159,19 @@ public class Table implements Serializable {
     this(getEmptyTable(databaseName, tableName));
   }
 
+  /** This api is used by getMetaData which require deep copy of metastore.api.table
+   * and constraints copy
+   */
+  public Table makeCopy() {
+
+    // make deep copy of metastore.api.table
+    Table newTab = new Table(this.getTTable().deepCopy());
+
+    // copy constraints
+    newTab.copyConstraints(this);
+    return newTab;
+  }
+
   public boolean isDummyTable() {
     return tTable.getTableName().equals(SemanticAnalyzer.DUMMY_TABLE);
   }
@@ -162,7 +196,7 @@ public class Table implements Serializable {
    * Initialize an empty table.
    */
   public static org.apache.hadoop.hive.metastore.api.Table
-  getEmptyTable(String databaseName, String tableName) {
+    getEmptyTable(String databaseName, String tableName) {
     StorageDescriptor sd = new StorageDescriptor();
     {
       sd.setSerdeInfo(new SerDeInfo());
@@ -175,6 +209,8 @@ public class Table implements Serializable {
       // We have to use MetadataTypedColumnsetSerDe because LazySimpleSerDe does
       // not support a table with no columns.
       sd.getSerdeInfo().setSerializationLib(MetadataTypedColumnsetSerDe.class.getName());
+      //TODO setting serializaton format here is hacky. Only lazy simple serde needs it
+      // so should be set by serde only. Setting it here sets it unconditionally.
       sd.getSerdeInfo().getParameters().put(serdeConstants.SERIALIZATION_FORMAT, "1");
       sd.setInputFormat(SequenceFileInputFormat.class.getName());
       sd.setOutputFormat(HiveSequenceFileOutputFormat.class.getName());
@@ -307,12 +343,20 @@ public class Table implements Serializable {
     try {
       storageHandler = HiveUtils.getStorageHandler(
           SessionState.getSessionConf(),
-        getProperty(
-          org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_STORAGE));
+          getProperty(
+              org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_STORAGE));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
     return storageHandler;
+  }
+
+  public StorageHandlerInfo getStorageHandlerInfo() {
+    return storageHandlerInfo;
+  }
+
+  public void setStorageHandlerInfo(StorageHandlerInfo storageHandlerInfo) {
+    this.storageHandlerInfo = storageHandlerInfo;
   }
 
   final public Class<? extends InputFormat> getInputFormatClass() {
@@ -326,7 +370,7 @@ public class Table implements Serializable {
           inputFormatClass = getStorageHandler().getInputFormatClass();
         } else {
           inputFormatClass = (Class<? extends InputFormat>)
-            Class.forName(className, true, Utilities.getSessionSpecifiedClassLoader());
+              Class.forName(className, true, Utilities.getSessionSpecifiedClassLoader());
         }
       } catch (ClassNotFoundException e) {
         throw new RuntimeException(e);
@@ -432,12 +476,12 @@ public class Table implements Serializable {
   }
 
   public void setTableType(TableType tableType) {
-     tTable.setTableType(tableType.toString());
-   }
+    tTable.setTableType(tableType.toString());
+  }
 
   public TableType getTableType() {
-     return Enum.valueOf(TableType.class, tTable.getTableType());
-   }
+    return Enum.valueOf(TableType.class, tTable.getTableType());
+  }
 
   public ArrayList<StructField> getFields() {
 
@@ -474,46 +518,46 @@ public class Table implements Serializable {
         getProperty(hive_metastoreConstants.TABLE_BUCKETING_VERSION));
   }
 
-   @Override
+  @Override
   public String toString() {
     return tTable.getTableName();
   }
 
-   /* (non-Javadoc)
-    * @see java.lang.Object#hashCode()
-    */
-   @Override
-   public int hashCode() {
-     final int prime = 31;
-     int result = 1;
-     result = prime * result + ((tTable == null) ? 0 : tTable.hashCode());
-     return result;
-   }
+  /* (non-Javadoc)
+   * @see java.lang.Object#hashCode()
+   */
+  @Override
+  public int hashCode() {
+    final int prime = 31;
+    int result = 1;
+    result = prime * result + ((tTable == null) ? 0 : tTable.hashCode());
+    return result;
+  }
 
-   /* (non-Javadoc)
-    * @see java.lang.Object#equals(java.lang.Object)
-    */
-   @Override
-   public boolean equals(Object obj) {
-     if (this == obj) {
-       return true;
-     }
-     if (obj == null) {
-       return false;
-     }
-     if (getClass() != obj.getClass()) {
-       return false;
-     }
-     Table other = (Table) obj;
-     if (tTable == null) {
-       if (other.tTable != null) {
-         return false;
-       }
-     } else if (!tTable.equals(other.tTable)) {
-       return false;
-     }
-     return true;
-   }
+  /* (non-Javadoc)
+   * @see java.lang.Object#equals(java.lang.Object)
+   */
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj == null) {
+      return false;
+    }
+    if (getClass() != obj.getClass()) {
+      return false;
+    }
+    Table other = (Table) obj;
+    if (tTable == null) {
+      if (other.tTable != null) {
+        return false;
+      }
+    } else if (!tTable.equals(other.tTable)) {
+      return false;
+    }
+    return true;
+  }
 
 
   public List<FieldSchema> getPartCols() {
@@ -579,7 +623,7 @@ public class Table implements Serializable {
     for (String col : bucketCols) {
       if (!isField(col)) {
         throw new HiveException("Bucket columns " + col
-            + " is not part of the table columns (" + getCols() );
+            + " is not part of the table columns (" + getCols());
       }
     }
     tTable.getSd().setBucketCols(bucketCols);
@@ -602,7 +646,7 @@ public class Table implements Serializable {
     mappings.put(valList, dirName);
   }
 
-  public Map<List<String>,String> getSkewedColValueLocationMaps() {
+  public Map<List<String>, String> getSkewedColValueLocationMaps() {
     return (tTable.getSd().getSkewedInfo() != null) ? tTable.getSd().getSkewedInfo()
         .getSkewedColValueLocationMaps() : new HashMap<List<String>, String>();
   }
@@ -673,7 +717,7 @@ public class Table implements Serializable {
     } catch (Exception e) {
       LOG.error("Unable to get field from serde: " + serializationLib, e);
     }
-    return new ArrayList<FieldSchema>();
+    return Collections.emptyList();
   }
 
   /**
@@ -960,8 +1004,8 @@ public class Table implements Serializable {
 
   public boolean isNonNative() {
     return getProperty(
-      org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_STORAGE)
-      != null;
+        org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.META_TABLE_STORAGE)
+        != null;
   }
 
   public String getFullyQualifiedName() {
@@ -1024,7 +1068,8 @@ public class Table implements Serializable {
 
   public static boolean hasMetastoreBasedSchema(HiveConf conf, String serdeLib) {
     return StringUtils.isEmpty(serdeLib) ||
-        conf.getStringCollection(ConfVars.SERDESUSINGMETASTOREFORSCHEMA.varname).contains(serdeLib);
+        MetastoreConf.getStringCollection(conf,
+            MetastoreConf.ConfVars.SERDES_USING_METASTORE_FOR_SCHEMA).contains(serdeLib);
   }
 
   public static boolean shouldStoreFieldsInMetastore(
@@ -1040,7 +1085,7 @@ public class Table implements Serializable {
     try {
       Class<?> clazz = conf.getClassByName(serdeLib);
       if (!AbstractSerDe.class.isAssignableFrom(clazz))
-       {
+      {
         return true; // The default.
       }
       deserializer = ReflectionUtil.newInstance(
@@ -1120,10 +1165,173 @@ public class Table implements Serializable {
   public void setStatsStateLikeNewTable() {
     if (isPartitioned()) {
       StatsSetupConst.setStatsStateForCreateTable(getParameters(), null,
-              StatsSetupConst.FALSE);
+          StatsSetupConst.FALSE);
     } else {
       StatsSetupConst.setStatsStateForCreateTable(getParameters(),
-              MetaStoreUtils.getColumnNames(getCols()), StatsSetupConst.TRUE);
+          MetaStoreUtils.getColumnNames(getCols()), StatsSetupConst.TRUE);
     }
   }
+
+  /** Constraints related methods
+   *  Note that set apis are used by DESCRIBE only, although get apis return RELY or ENABLE
+   *  constraints DESCRIBE could set all type of constraints
+   * */
+
+  /* This only return PK which are created with RELY */
+  public PrimaryKeyInfo getPrimaryKeyInfo() {
+    if(!this.isPKFetched) {
+      try {
+        pki = Hive.get().getReliablePrimaryKeys(this.getDbName(), this.getTableName());
+        this.isPKFetched = true;
+      } catch (HiveException e) {
+        LOG.warn("Cannot retrieve PK info for table : " + this.getTableName()
+            + " ignoring exception: " + e);
+      }
+    }
+    return pki;
+  }
+
+  public void setPrimaryKeyInfo(PrimaryKeyInfo pki) {
+    this.pki = pki;
+    this.isPKFetched = true;
+  }
+
+  /* This only return FK constraints which are created with RELY */
+  public ForeignKeyInfo getForeignKeyInfo() {
+    if(!isFKFetched) {
+      try {
+        fki = Hive.get().getReliableForeignKeys(this.getDbName(), this.getTableName());
+        this.isFKFetched = true;
+      } catch (HiveException e) {
+        LOG.warn(
+            "Cannot retrieve FK info for table : " + this.getTableName()
+                + " ignoring exception: " + e);
+      }
+    }
+    return fki;
+  }
+
+  public void setForeignKeyInfo(ForeignKeyInfo fki) {
+    this.fki = fki;
+    this.isFKFetched = true;
+  }
+
+  /* This only return UNIQUE constraint defined with RELY */
+  public UniqueConstraint getUniqueKeyInfo() {
+    if(!isUniqueFetched) {
+      try {
+        uki = Hive.get().getReliableUniqueConstraints(this.getDbName(), this.getTableName());
+        this.isUniqueFetched = true;
+      } catch (HiveException e) {
+        LOG.warn(
+            "Cannot retrieve Unique Key info for table : " + this.getTableName()
+                + " ignoring exception: " + e);
+      }
+    }
+    return uki;
+  }
+
+  public void setUniqueKeyInfo(UniqueConstraint uki) {
+    this.uki = uki;
+    this.isUniqueFetched = true;
+  }
+
+  /* This only return NOT NULL constraint defined with RELY */
+  public NotNullConstraint getNotNullConstraint() {
+    if(!isNotNullFetched) {
+      try {
+        nnc = Hive.get().getReliableNotNullConstraints(this.getDbName(), this.getTableName());
+        this.isNotNullFetched = true;
+      } catch (HiveException e) {
+        LOG.warn("Cannot retrieve Not Null constraint info for table : "
+            + this.getTableName() + " ignoring exception: " + e);
+      }
+    }
+    return nnc;
+  }
+
+  public void setNotNullConstraint(NotNullConstraint nnc) {
+    this.nnc = nnc;
+    this.isNotNullFetched = true;
+  }
+
+  /* This only return DEFAULT constraint defined with ENABLE */
+  public DefaultConstraint getDefaultConstraint() {
+    if(!isDefaultFetched) {
+      try {
+        dc = Hive.get().getEnabledDefaultConstraints(this.getDbName(), this.getTableName());
+        this.isDefaultFetched = true;
+      } catch (HiveException e) {
+        LOG.warn("Cannot retrieve Default constraint info for table : "
+            + this.getTableName() + " ignoring exception: " + e);
+      }
+    }
+    return dc;
+  }
+
+  public void setDefaultConstraint(DefaultConstraint dc) {
+    this.dc = dc;
+    this.isDefaultFetched = true;
+  }
+
+  /* This only return CHECK constraint defined with ENABLE */
+  public CheckConstraint getCheckConstraint() {
+    if(!isCheckFetched) {
+      try{
+        cc = Hive.get().getEnabledCheckConstraints(this.getDbName(), this.getTableName());
+        this.isCheckFetched = true;
+      } catch (HiveException e) {
+        LOG.warn("Cannot retrieve Check constraint info for table : "
+            + this.getTableName() + " ignoring exception: " + e);
+      }
+    }
+    return cc;
+  }
+
+  public void setCheckConstraint(CheckConstraint cc) {
+    this.cc = cc;
+    this.isCheckFetched = true;
+  }
+
+  /** This shouldn't use get apis because those api call metastore
+   * to fetch constraints.
+   * getMetaData only need to make a copy of existing constraints, even if those are not fetched
+   */
+  public void copyConstraints(final Table tbl) {
+    this.pki = tbl.pki;
+    this.isPKFetched = tbl.isPKFetched;
+
+    this.fki = tbl.fki;
+    this.isFKFetched = tbl.isFKFetched;
+
+    this.uki = tbl.uki;
+    this.isUniqueFetched = tbl.isUniqueFetched;
+
+    this.nnc = tbl.nnc;
+    this.isNotNullFetched = tbl.isNotNullFetched;
+
+    this.dc = tbl.dc;
+    this.isDefaultFetched = tbl.isDefaultFetched;
+
+    this.cc = tbl.cc;
+    this.isCheckFetched = tbl.isCheckFetched;
+  }
+
+  /**
+   * This method ignores the write Id, while comparing two tables.
+   *
+   * @param tbl table to compare with
+   * @return
+   */
+  public boolean equalsWithIgnoreWriteId(Table tbl ) {
+    long targetWriteId = getTTable().getWriteId();
+    long entityWriteId = tbl.getTTable().getWriteId();
+    getTTable().setWriteId(0L);
+    tbl.getTTable().setWriteId(0L);
+    boolean result = equals(tbl);
+    getTTable().setWriteId(targetWriteId);
+    tbl.getTTable().setWriteId(entityWriteId);
+    return result;
+  }
+
 };

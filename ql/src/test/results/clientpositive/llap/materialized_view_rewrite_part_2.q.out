@@ -151,6 +151,7 @@ POSTHOOK: Input: default@depts_n00
 POSTHOOK: Input: default@emps_n00
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@mv1_part_n0
+POSTHOOK: Output: default@mv1_part_n0
 POSTHOOK: Output: default@mv1_part_n0@deptno=20
 POSTHOOK: Lineage: mv1_part_n0 PARTITION(deptno=20).empid SIMPLE [(emps_n00)emps_n00.FieldSchema(name:empid, type:int, comment:null), ]
 PREHOOK: query: explain
@@ -234,6 +235,7 @@ POSTHOOK: type: CREATE_MATERIALIZED_VIEW
 POSTHOOK: Input: default@depts_n00
 POSTHOOK: Input: default@emps_n00
 POSTHOOK: Output: database:default
+POSTHOOK: Output: default@mv1_part_n0
 POSTHOOK: Output: default@mv1_part_n0
 POSTHOOK: Output: default@mv1_part_n0@deptno=20
 POSTHOOK: Lineage: mv1_part_n0 PARTITION(deptno=20).empid SIMPLE [(emps_n00)emps_n00.FieldSchema(name:empid, type:int, comment:null), ]
@@ -319,6 +321,7 @@ POSTHOOK: Input: default@depts_n00
 POSTHOOK: Input: default@emps_n00
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@mv1_part_n0
+POSTHOOK: Output: default@mv1_part_n0
 POSTHOOK: Output: default@mv1_part_n0@deptno=20
 POSTHOOK: Lineage: mv1_part_n0 PARTITION(deptno=20).empid SIMPLE [(emps_n00)emps_n00.FieldSchema(name:empid, type:int, comment:null), ]
 PREHOOK: query: explain
@@ -402,6 +405,7 @@ POSTHOOK: type: CREATE_MATERIALIZED_VIEW
 POSTHOOK: Input: default@depts_n00
 POSTHOOK: Input: default@emps_n00
 POSTHOOK: Output: database:default
+POSTHOOK: Output: default@mv1_part_n0
 POSTHOOK: Output: default@mv1_part_n0
 POSTHOOK: Output: default@mv1_part_n0@deptno=10
 POSTHOOK: Output: default@mv1_part_n0@deptno=20
@@ -499,6 +503,7 @@ POSTHOOK: Input: default@depts_n00
 POSTHOOK: Input: default@emps_n00
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@mv1_part_n0
+POSTHOOK: Output: default@mv1_part_n0
 POSTHOOK: Output: default@mv1_part_n0@deptno=10
 POSTHOOK: Output: default@mv1_part_n0@deptno=20
 POSTHOOK: Lineage: mv1_part_n0 PARTITION(deptno=10).empid SIMPLE [(emps_n00)emps_n00.FieldSchema(name:empid, type:int, comment:null), ]
@@ -553,6 +558,7 @@ STAGE PLANS:
                       Statistics: Num rows: 5 Data size: 20 Basic stats: COMPLETE Column stats: COMPLETE
                       Reduce Output Operator
                         key expressions: _col0 (type: int)
+                        null sort order: z
                         sort order: +
                         Map-reduce partition columns: _col0 (type: int)
                         Statistics: Num rows: 5 Data size: 20 Basic stats: COMPLETE Column stats: COMPLETE
@@ -569,6 +575,7 @@ STAGE PLANS:
                     Statistics: Num rows: 3 Data size: 12 Basic stats: COMPLETE Column stats: COMPLETE
                     Reduce Output Operator
                       key expressions: _col0 (type: int)
+                      null sort order: z
                       sort order: +
                       Map-reduce partition columns: _col0 (type: int)
                       Statistics: Num rows: 3 Data size: 12 Basic stats: COMPLETE Column stats: COMPLETE
@@ -578,7 +585,7 @@ STAGE PLANS:
                       Statistics: Num rows: 3 Data size: 12 Basic stats: COMPLETE Column stats: COMPLETE
                       Group By Operator
                         keys: _col0 (type: int)
-                        minReductionHashAggr: 0.0
+                        minReductionHashAggr: 0.6666666
                         mode: hash
                         outputColumnNames: _col0
                         Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: COMPLETE
@@ -603,12 +610,13 @@ STAGE PLANS:
                 Statistics: Num rows: 5 Data size: 20 Basic stats: COMPLETE Column stats: COMPLETE
                 Group By Operator
                   keys: _col1 (type: int)
-                  minReductionHashAggr: 0.0
+                  minReductionHashAggr: 0.6
                   mode: hash
                   outputColumnNames: _col0
                   Statistics: Num rows: 2 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
                   Reduce Output Operator
                     key expressions: _col0 (type: int)
+                    null sort order: z
                     sort order: +
                     Map-reduce partition columns: _col0 (type: int)
                     Statistics: Num rows: 2 Data size: 8 Basic stats: COMPLETE Column stats: COMPLETE
@@ -689,6 +697,7 @@ POSTHOOK: Input: default@depts_n00
 POSTHOOK: Input: default@emps_n00
 POSTHOOK: Output: database:default
 POSTHOOK: Output: default@mv1_part_n0
+POSTHOOK: Output: default@mv1_part_n0
 POSTHOOK: Output: default@mv1_part_n0@deptno2=20
 POSTHOOK: Output: default@mv1_part_n0@deptno2=30
 POSTHOOK: Lineage: mv1_part_n0 PARTITION(deptno2=20).deptno SIMPLE [(emps_n00)emps_n00.FieldSchema(name:deptno, type:int, comment:null), ]
@@ -745,7 +754,7 @@ STAGE PLANS:
             Map Operator Tree:
                 TableScan
                   alias: default.mv1_part_n0
-                  filterExpr: ((name = name2) and (deptno = deptno2)) (type: boolean)
+                  filterExpr: ((deptno = deptno2) and (name = name2)) (type: boolean)
                   Statistics: Num rows: 8 Data size: 1560 Basic stats: COMPLETE Column stats: COMPLETE
                   Filter Operator
                     predicate: ((deptno = deptno2) and (name = name2)) (type: boolean)
@@ -756,12 +765,13 @@ STAGE PLANS:
                       Statistics: Num rows: 2 Data size: 390 Basic stats: COMPLETE Column stats: COMPLETE
                       Group By Operator
                         keys: _col0 (type: int)
-                        minReductionHashAggr: 0.0
+                        minReductionHashAggr: 0.5
                         mode: hash
                         outputColumnNames: _col0
                         Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: COMPLETE
                         Reduce Output Operator
                           key expressions: _col0 (type: int)
+                          null sort order: z
                           sort order: +
                           Map-reduce partition columns: _col0 (type: int)
                           Statistics: Num rows: 1 Data size: 4 Basic stats: COMPLETE Column stats: COMPLETE

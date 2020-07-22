@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hive.ql.txn.compactor;
 
+import it.unimi.dsi.fastutil.booleans.AbstractBooleanBidirectionalIterator;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -24,6 +25,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.common.StringableMap;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreUtils;
+import org.apache.hadoop.hive.metastore.TransactionalValidationListener;
 import org.apache.hadoop.hive.metastore.api.CompactionRequest;
 import org.apache.hadoop.hive.metastore.api.CompactionType;
 import org.apache.hadoop.hive.metastore.api.Order;
@@ -32,6 +35,10 @@ import org.apache.hadoop.hive.metastore.api.ShowCompactRequest;
 import org.apache.hadoop.hive.metastore.api.ShowCompactResponse;
 import org.apache.hadoop.hive.metastore.api.ShowCompactResponseElement;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.metastore.api.TxnInfo;
+import org.apache.hadoop.hive.metastore.api.TxnState;
+import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
+import org.apache.hadoop.hive.metastore.txn.TxnStore;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
 import org.junit.After;
 import org.junit.Assert;
@@ -47,12 +54,17 @@ import java.io.DataOutput;
 import java.io.DataOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Tests for the worker thread and its MR jobs.
@@ -156,7 +168,7 @@ public class TestWorker extends CompactorTest {
     deltas[1] = new Path(delta2);
 
     CompactorMR.CompactorInputSplit split =
-        new CompactorMR.CompactorInputSplit(conf, 3, files, new Path(basename), deltas);
+        new CompactorMR.CompactorInputSplit(conf, 3, files, new Path(basename), deltas, new HashMap<String, String>());
 
     Assert.assertEquals(520L, split.getLength());
     String[] locations = split.getLocations();
@@ -201,7 +213,7 @@ public class TestWorker extends CompactorTest {
     deltas[1] = new Path(delta2);
 
     CompactorMR.CompactorInputSplit split =
-        new CompactorMR.CompactorInputSplit(conf, 3, files, null, deltas);
+        new CompactorMR.CompactorInputSplit(conf, 3, files, null, deltas, new HashMap<String, String>());
 
     ByteArrayOutputStream buf = new ByteArrayOutputStream();
     DataOutput out = new DataOutputStream(buf);
@@ -346,10 +358,11 @@ public class TestWorker extends CompactorTest {
 
     startWorker();
 
+    // since compaction was not run, state should not be "ready for cleaning" but "succeeded"
     ShowCompactResponse rsp = txnHandler.showCompact(new ShowCompactRequest());
     List<ShowCompactResponseElement> compacts = rsp.getCompacts();
     Assert.assertEquals(1, compacts.size());
-    Assert.assertEquals("ready for cleaning", compacts.get(0).getState());
+    Assert.assertEquals(TxnStore.SUCCEEDED_RESPONSE, compacts.get(0).getState());
 
     // There should still be 4 directories in the location
     FileSystem fs = FileSystem.get(conf);
@@ -1005,8 +1018,145 @@ public class TestWorker extends CompactorTest {
     Assert.assertEquals(0, compacts.size());
   }
 
+  @Test
+  public void oneDeltaWithAbortedTxn() throws Exception {
+    Table t = newTable("default", "delta1", false);
+    addDeltaFile(t, null, 0, 2L, 3);
+    Set<Long> aborted = new HashSet<>();
+    aborted.add(1L);
+    burnThroughTransactions("default", "delta1", 3, null, aborted);
+
+    // MR
+    verifyTxn1IsAborted(0, t, CompactionType.MAJOR);
+    verifyTxn1IsAborted(1, t, CompactionType.MINOR);
+
+    // Query-based
+    conf.setBoolVar(HiveConf.ConfVars.COMPACTOR_CRUD_QUERY_BASED, true);
+    verifyTxn1IsAborted(2, t, CompactionType.MAJOR);
+    verifyTxn1IsAborted(3, t, CompactionType.MINOR);
+    conf.setBoolVar(HiveConf.ConfVars.COMPACTOR_CRUD_QUERY_BASED, false);
+
+    // Insert-only
+    Map<String, String> parameters = new HashMap<>();
+    parameters.put(hive_metastoreConstants.TABLE_TRANSACTIONAL_PROPERTIES,
+        TransactionalValidationListener.INSERTONLY_TRANSACTIONAL_PROPERTY);
+    Table mm = newTable("default", "delta1", false, parameters);
+    addDeltaFile(mm, null, 0, 2L, 3);
+    burnThroughTransactions("default", "delta1", 3, null, aborted);
+    verifyTxn1IsAborted(0, t, CompactionType.MAJOR);
+    verifyTxn1IsAborted(1, t, CompactionType.MINOR);
+  }
+
+  private void verifyTxn1IsAborted(int compactionNum, Table t, CompactionType type)
+      throws Exception {
+    CompactionRequest rqst = new CompactionRequest("default", t.getTableName(), type);
+    txnHandler.compact(rqst);
+    startWorker();
+
+    // Compaction should not have run on a single delta file
+    FileSystem fs = FileSystem.get(conf);
+    FileStatus[] stat = fs.listStatus(new Path(t.getSd().getLocation()));
+    Assert.assertEquals(1, stat.length);
+    Assert.assertEquals(makeDeltaDirName(0, 2), stat[0].getPath().getName());
+
+    // State should not be "ready for cleaning" because we skip cleaning
+    List<ShowCompactResponseElement> compacts =
+        txnHandler.showCompact(new ShowCompactRequest()).getCompacts();
+    Assert.assertEquals(compactionNum + 1, compacts.size());
+    Assert.assertEquals(TxnStore.SUCCEEDED_RESPONSE, compacts.get(compactionNum).getState());
+
+    // assert transaction with txnId=1 is still aborted after cleaner is run
+    startCleaner();
+    List<TxnInfo> openTxns =
+        HiveMetaStoreUtils.getHiveMetastoreClient(conf).showTxns().getOpen_txns();
+    Assert.assertEquals(1, openTxns.get(0).getId());
+    Assert.assertEquals(TxnState.ABORTED, openTxns.get(0).getState());
+  }
+
+  // With high timeout, but fast run we should finish without a problem
+  @Test(timeout=1000)
+  public void testNormalRun() throws Exception {
+    runTimeoutTest(10000, false, true);
+  }
+
+  // With low timeout, but slow run we should finish without a problem
+  @Test(timeout=1000)
+  public void testTimeoutWithInterrupt() throws Exception {
+    runTimeoutTest(1, true, false);
+  }
+
+  // With low timeout, but slow run we should finish without a problem, even if the interrupt is swallowed
+  @Test(timeout=1000)
+  public void testTimeoutWithoutInterrupt() throws Exception {
+    runTimeoutTest(1, true, true);
+  }
+
+  private void runTimeoutTest(long timeout, boolean runForever, boolean swallowInterrupt) throws Exception {
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    HiveConf timeoutConf = new HiveConf(conf);
+    TimeoutWorker timeoutWorker;
+
+    timeoutConf.setTimeVar(HiveConf.ConfVars.HIVE_COMPACTOR_WORKER_TIMEOUT, timeout, TimeUnit.MILLISECONDS);
+    timeoutWorker = getTimeoutWorker(timeoutConf, executor, runForever, swallowInterrupt);
+
+    // Wait until at least 1st loop is finished
+    while (!timeoutWorker.looped.get()) {
+      Thread.sleep(10L);
+    }
+
+    timeoutWorker.looped.set(false);
+
+    // Wait until the 2nd loop is finished
+    while (!timeoutWorker.looped.get()) {
+      Thread.sleep(10L);
+    }
+
+    timeoutWorker.stop.set(true);
+    executor.shutdownNow();
+  }
+
+  private TimeoutWorker getTimeoutWorker(HiveConf conf, ExecutorService executor, boolean runForever,
+      boolean swallowInterrupt) throws Exception {
+    TimeoutWorker timeoutWorker = new TimeoutWorker(runForever, swallowInterrupt);
+    timeoutWorker.setThreadId((int)timeoutWorker.getId());
+    timeoutWorker.setConf(conf);
+    timeoutWorker.init(new AtomicBoolean(false));
+    executor.submit(() -> timeoutWorker.run());
+    return timeoutWorker;
+  }
+
   @After
   public void tearDown() throws Exception {
     compactorTestCleanup();
+  }
+
+  private static final class TimeoutWorker extends Worker {
+    private boolean runForever;
+    private boolean swallowInterrupt;
+    private AtomicBoolean looped;
+
+    private TimeoutWorker(boolean runForever, boolean swallowInterrupt) {
+      this.runForever = runForever;
+      this.swallowInterrupt = swallowInterrupt;
+      this.looped = new AtomicBoolean(false);
+    }
+
+    protected Boolean findNextCompactionAndExecute(boolean computeStats) throws InterruptedException {
+      looped.set(true);
+      if (runForever) {
+        while (!stop.get()) {
+          try {
+            looped.set(true);
+            Thread.sleep(Long.MAX_VALUE);
+          } catch (InterruptedException ie) {
+            if (!swallowInterrupt) {
+              throw ie;
+            }
+            Thread.sleep(Long.MAX_VALUE);
+          }
+        }
+      }
+      return true;
+    }
   }
 }

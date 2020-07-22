@@ -17,8 +17,21 @@
  */
 package org.apache.hadoop.hive.ql.parse;
 
-import org.apache.hadoop.hive.ql.parse.WarehouseInstance;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.parse.repl.PathBuilder;
+import org.junit.Assert;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.HashSet;
 
 /**
  * ReplicationTestUtils - static helper functions for replication test
@@ -252,12 +265,12 @@ public class ReplicationTestUtils {
                                                               String primaryDbName, String replicatedDbName,
                                                               List<String> selectStmtList,
                                                   List<String[]> expectedValues, String lastReplId) throws Throwable {
-    WarehouseInstance.Tuple incrementalDump = primary.dump(primaryDbName, lastReplId);
-    replica.loadWithoutExplain(replicatedDbName, incrementalDump.dumpLocation)
+    WarehouseInstance.Tuple incrementalDump = primary.dump(primaryDbName);
+    replica.loadWithoutExplain(replicatedDbName, primaryDbName)
             .run("REPL STATUS " + replicatedDbName).verifyResult(incrementalDump.lastReplicationId);
     verifyResultsInReplica(replica, replicatedDbName, selectStmtList, expectedValues);
 
-    replica.loadWithoutExplain(replicatedDbName, incrementalDump.dumpLocation)
+    replica.loadWithoutExplain(replicatedDbName, primaryDbName)
             .run("REPL STATUS " + replicatedDbName).verifyResult(incrementalDump.lastReplicationId);
     verifyResultsInReplica(replica, replicatedDbName, selectStmtList, expectedValues);
     return incrementalDump;
@@ -487,5 +500,44 @@ public class ReplicationTestUtils {
         .run("select last_update_user from " + tableName + " order by last_update_user")
         .verifyResults(new String[] {"creation", "creation", "creation", "creation", "creation",
                 "creation", "creation", "merge_update", "merge_insert", "merge_insert"});
+  }
+
+  public static List<String> includeExternalTableClause(boolean enable) {
+    List<String> withClause = new ArrayList<>();
+    withClause.add("'" + HiveConf.ConfVars.REPL_INCLUDE_EXTERNAL_TABLES.varname + "'='" + enable + "'");
+    withClause.add("'distcp.options.pugpb'=''");
+    return withClause;
+  }
+
+  public static List<String> externalTableWithClause(List<String> externalTableBasePathWithClause, Boolean bootstrap,
+                                                     Boolean includeExtTbl) {
+    List<String> withClause = new ArrayList<>(externalTableBasePathWithClause);
+    if (bootstrap != null) {
+      withClause.add("'" + HiveConf.ConfVars.REPL_BOOTSTRAP_EXTERNAL_TABLES + "'='" + Boolean.toString(bootstrap)
+              + "'");
+    }
+    if (includeExtTbl != null) {
+      withClause.add("'" + HiveConf.ConfVars.REPL_INCLUDE_EXTERNAL_TABLES + "'='" + Boolean.toString(includeExtTbl)
+              + "'");
+    }
+    return withClause;
+  }
+
+  public static void assertExternalFileInfo(WarehouseInstance warehouseInstance,
+                                      List<String> expected, Path externalTableInfoFile) throws IOException {
+    DistributedFileSystem fileSystem = warehouseInstance.miniDFSCluster.getFileSystem();
+    Assert.assertTrue(fileSystem.exists(externalTableInfoFile));
+    InputStream inputStream = fileSystem.open(externalTableInfoFile);
+    BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+    Set<String> tableNames = new HashSet<>();
+    for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+      String[] components = line.split(",");
+      Assert.assertEquals("The file should have tableName,base64encoded(data_location)",
+              2, components.length);
+      tableNames.add(components[0]);
+      Assert.assertTrue(components[1].length() > 0);
+    }
+    Assert.assertTrue(tableNames.containsAll(expected));
+    reader.close();
   }
 }

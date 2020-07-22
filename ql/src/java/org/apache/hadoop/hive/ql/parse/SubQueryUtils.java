@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hive.ql.parse;
 
+import static org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer.getTableAlias;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -116,8 +118,9 @@ public class SubQueryUtils {
      */
     if (subqueryExprNode.getChildren().size() == 3
         && subqueryExprNode.getChild(2).getType() == HiveParser.TOK_SUBQUERY_EXPR) {
-      throw new CalciteSubquerySemanticException(ErrorMsg.UNSUPPORTED_SUBQUERY_EXPRESSION
-          .getMsg(subqueryExprNode.getChild(2), "SubQuery on left hand side is not supported."));
+      throw new CalciteSubquerySemanticException(ASTErrorUtils.getMsg(
+          ErrorMsg.UNSUPPORTED_SUBQUERY_EXPRESSION.getMsg(),
+          subqueryExprNode.getChild(2), "SubQuery on left hand side is not supported."));
     }
 
     // avoid subquery restrictions for SOME/ALL for now
@@ -142,9 +145,9 @@ public class SubQueryUtils {
     ASTNode outerQueryExpr = (ASTNode) subqueryExprNode.getChild(2);
 
     if (outerQueryExpr != null && outerQueryExpr.getType() == HiveParser.TOK_SUBQUERY_EXPR) {
-      throw new CalciteSubquerySemanticException(
-          ErrorMsg.UNSUPPORTED_SUBQUERY_EXPRESSION.getMsg(
-              outerQueryExpr, "IN/EXISTS/SOME/ALL subqueries are not allowed in LHS"));
+      throw new CalciteSubquerySemanticException(ASTErrorUtils.getMsg(
+          ErrorMsg.UNSUPPORTED_SUBQUERY_EXPRESSION.getMsg(),
+          outerQueryExpr, "IN/EXISTS/SOME/ALL subqueries are not allowed in LHS"));
     }
 
     QBSubQuery subQuery = SubQueryUtils.buildSubQuery(qb.getId(), sqIdx, subqueryExprNode,
@@ -259,7 +262,8 @@ public class SubQueryUtils {
       /*
        *  Restriction.7.h :: SubQuery predicates can appear only as top level conjuncts.
        */
-      throw new SemanticException(ErrorMsg.UNSUPPORTED_SUBQUERY_EXPRESSION.getMsg(
+      throw new SemanticException(ASTErrorUtils.getMsg(
+          ErrorMsg.UNSUPPORTED_SUBQUERY_EXPRESSION.getMsg(),
           subQuery, "Only SubQuery expressions that are top level conjuncts are allowed"));
     }
   }
@@ -363,15 +367,7 @@ public class SubQueryUtils {
     if ((joinNode.getToken().getType() == HiveParser.TOK_TABREF)
         || (joinNode.getToken().getType() == HiveParser.TOK_SUBQUERY)
         || (joinNode.getToken().getType() == HiveParser.TOK_PTBLFUNCTION)) {
-      String tableName = SemanticAnalyzer.getUnescapedUnqualifiedTableName((ASTNode) joinNode.getChild(0))
-          .toLowerCase();
-      String alias = joinNode.getChildCount() == 1 ? tableName
-          : SemanticAnalyzer.unescapeIdentifier(joinNode.getChild(joinNode.getChildCount() - 1)
-          .getText().toLowerCase());
-      alias = (joinNode.getToken().getType() == HiveParser.TOK_PTBLFUNCTION) ?
-          SemanticAnalyzer.unescapeIdentifier(joinNode.getChild(1).getText().toLowerCase()) :
-          alias;
-      aliases.add(alias);
+      aliases.add(getTableAlias(joinNode));
     } else {
       ASTNode left = (ASTNode) joinNode.getChild(0);
       ASTNode right = (ASTNode) joinNode.getChild(1);
@@ -584,7 +580,7 @@ public class SubQueryUtils {
       List<ASTNode> corrExprs,
       RowResolver sqRR) {
 
-    subQueryAST = (ASTNode) ParseDriver.adaptor.dupTree(subQueryAST);
+    subQueryAST = (ASTNode) SubQueryUtils.adaptor.dupTree(subQueryAST);
     ASTNode qry = (ASTNode)
         ParseDriver.adaptor.create(HiveParser.TOK_QUERY, "TOK_QUERY");
 
@@ -693,7 +689,7 @@ public class SubQueryUtils {
     ASTNode searchCond = isNull(createColRefAST(sqAlias, colAlias));
 
     for(ASTNode e : corrExprs ) {
-      ASTNode p = (ASTNode) ParseDriver.adaptor.dupTree(e);
+      ASTNode p = (ASTNode) SubQueryUtils.adaptor.dupTree(e);
       p = isNull(p);
       searchCond = orAST(searchCond, p);
     }

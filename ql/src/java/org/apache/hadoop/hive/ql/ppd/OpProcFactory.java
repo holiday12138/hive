@@ -28,8 +28,10 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 
+import javolution.util.FastBitSet;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.FilterOperator;
+import org.apache.hadoop.hive.ql.exec.GroupByOperator;
 import org.apache.hadoop.hive.ql.exec.JoinOperator;
 import org.apache.hadoop.hive.ql.exec.LateralViewJoinOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
@@ -41,7 +43,7 @@ import org.apache.hadoop.hive.ql.exec.SelectOperator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.lib.Node;
-import org.apache.hadoop.hive.ql.lib.NodeProcessor;
+import org.apache.hadoop.hive.ql.lib.SemanticNodeProcessor;
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.metadata.HiveStorageHandler;
 import org.apache.hadoop.hive.ql.metadata.HiveStoragePredicateHandler;
@@ -55,6 +57,7 @@ import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDescUtils;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.FilterDesc;
+import org.apache.hadoop.hive.ql.plan.GroupByDesc;
 import org.apache.hadoop.hive.ql.plan.JoinCondDesc;
 import org.apache.hadoop.hive.ql.plan.JoinDesc;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
@@ -156,7 +159,7 @@ public final class OpProcFactory {
   /**
    * Processor for Script Operator Prevents any predicates being pushed.
    */
-  public static class ScriptPPD extends DefaultPPD implements NodeProcessor {
+  public static class ScriptPPD extends DefaultPPD implements SemanticNodeProcessor {
 
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
@@ -217,6 +220,7 @@ public final class OpProcFactory {
       }
 
       WindowTableFunctionDef wTFn = (WindowTableFunctionDef) conf.getFuncDef();
+
       List<Integer> rFnIdxs = rankingFunctions(wTFn);
 
       if ( rFnIdxs.size() == 0 ) {
@@ -325,7 +329,6 @@ public final class OpProcFactory {
      * reference rows past the Current Row.
      */
     private boolean canPushLimitToReduceSink(WindowTableFunctionDef wTFn) {
-
       for(WindowFunctionDef wFnDef : wTFn.getWindowFunctions() ) {
         if ( (wFnDef.getWFnEval() instanceof GenericUDAFRankEvaluator) ||
             (wFnDef.getWFnEval() instanceof GenericUDAFDenseRankEvaluator )  ||
@@ -364,7 +367,7 @@ public final class OpProcFactory {
     }
   }
 
-  public static class UDTFPPD extends DefaultPPD implements NodeProcessor {
+  public static class UDTFPPD extends DefaultPPD implements SemanticNodeProcessor {
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
         Object... nodeOutputs) throws SemanticException {
@@ -382,7 +385,7 @@ public final class OpProcFactory {
 
   }
 
-  public static class LateralViewForwardPPD extends DefaultPPD implements NodeProcessor {
+  public static class LateralViewForwardPPD extends DefaultPPD implements SemanticNodeProcessor {
 
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
@@ -409,7 +412,7 @@ public final class OpProcFactory {
    * Combines predicates of its child into a single expression and adds a filter
    * op as new child.
    */
-  public static class TableScanPPD extends DefaultPPD implements NodeProcessor {
+  public static class TableScanPPD extends DefaultPPD implements SemanticNodeProcessor {
 
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
@@ -437,7 +440,7 @@ public final class OpProcFactory {
    * Determines the push down predicates in its where expression and then
    * combines it with the push down predicates that are passed from its children.
    */
-  public static class FilterPPD extends DefaultPPD implements NodeProcessor {
+  public static class FilterPPD extends DefaultPPD implements SemanticNodeProcessor {
 
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
@@ -496,7 +499,7 @@ public final class OpProcFactory {
     }
   }
 
-  public static class SimpleFilterPPD extends FilterPPD implements NodeProcessor {
+  public static class SimpleFilterPPD extends FilterPPD implements SemanticNodeProcessor {
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
         Object... nodeOutputs) throws SemanticException {
@@ -532,7 +535,7 @@ public final class OpProcFactory {
    * Determines predicates for which alias can be pushed to it's parents. See
    * the comments for getQualifiedAliases function.
    */
-  public static class JoinerPPD extends DefaultPPD implements NodeProcessor {
+  public static class JoinerPPD extends DefaultPPD implements SemanticNodeProcessor {
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
         Object... nodeOutputs) throws SemanticException {
@@ -652,7 +655,7 @@ public final class OpProcFactory {
     }
   }
 
-  public static class ReduceSinkPPD extends DefaultPPD implements NodeProcessor {
+  public static class ReduceSinkPPD extends DefaultPPD implements SemanticNodeProcessor {
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
                           Object... nodeOutputs) throws SemanticException {
@@ -733,10 +736,102 @@ public final class OpProcFactory {
     }
   }
 
+  public static class GroupByPPD extends DefaultPPD implements SemanticNodeProcessor {
+
+    @Override
+    public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
+        Object... nodeOutputs) throws SemanticException {
+      super.process(nd, stack, procCtx, nodeOutputs);
+      OpWalkerInfo owi = (OpWalkerInfo) procCtx;
+      GroupByDesc groupByDesc = ((GroupByOperator)nd).getConf();
+      ExprWalkerInfo prunedPred = owi.getPrunedPreds((Operator<? extends OperatorDesc>) nd);
+      if (prunedPred == null || !prunedPred.hasAnyCandidates() ||
+          !groupByDesc.isGroupingSetsPresent()) {
+        return null;
+      }
+
+      List<Long> groupingSets = groupByDesc.getListGroupingSets();
+      Map<String, List<ExprNodeDesc>> candidates = prunedPred.getFinalCandidates();
+      FastBitSet[] fastBitSets = new FastBitSet[groupingSets.size()];
+      int groupingSetPosition = groupByDesc.getGroupingSetPosition();
+      for (int pos = 0; pos < fastBitSets.length; pos ++) {
+        fastBitSets[pos] = GroupByOperator.groupingSet2BitSet(groupingSets.get(pos),
+            groupingSetPosition);
+      }
+      List<ExprNodeDesc> groupByKeys = ((GroupByOperator)nd).getConf().getKeys();
+      Map<ExprNodeDesc, ExprNodeDesc> newToOldExprMap = prunedPred.getNewToOldExprMap();
+      Map<String, List<ExprNodeDesc>> nonFinalCandidates = new HashMap<String, List<ExprNodeDesc>>();
+      Iterator<Map.Entry<String, List<ExprNodeDesc>>> iter = candidates.entrySet().iterator();
+      while (iter.hasNext()) {
+        Map.Entry<String, List<ExprNodeDesc>> entry = iter.next();
+        List<ExprNodeDesc> residualExprs = new ArrayList<ExprNodeDesc>();
+        List<ExprNodeDesc> finalCandidates = new ArrayList<ExprNodeDesc>();
+        List<ExprNodeDesc> exprs = entry.getValue();
+        for (ExprNodeDesc expr : exprs) {
+          if (canPredPushdown(expr, groupByKeys, fastBitSets, groupingSetPosition)) {
+            finalCandidates.add(expr);
+          } else {
+            residualExprs.add(newToOldExprMap.get(expr));
+          }
+        }
+        if (!residualExprs.isEmpty()) {
+          nonFinalCandidates.put(entry.getKey(), residualExprs);
+        }
+
+        if (finalCandidates.isEmpty()) {
+          iter.remove();
+        } else {
+          exprs.clear();
+          exprs.addAll(finalCandidates);
+        }
+      }
+      
+      if (!nonFinalCandidates.isEmpty()) {
+        createFilter((Operator) nd, nonFinalCandidates, owi);
+      }
+      return null;
+    }
+
+    private void getGBYKeyPosFromExpr(ExprNodeDesc expr, List<ExprNodeDesc> groupByKeys,
+        List<Integer> gbyKeyPos) {
+      for (int i = 0; i < groupByKeys.size(); i++) {
+        if (groupByKeys.get(i).isSame(expr)) {
+          gbyKeyPos.add(i);
+          return;
+        }
+      }
+      if (expr.getChildren() != null) {
+        for (int i = 0; i < expr.getChildren().size(); i++) {
+          getGBYKeyPosFromExpr(expr.getChildren().get(i), groupByKeys, gbyKeyPos);
+        }
+      }
+    }
+
+    private boolean canPredPushdown(ExprNodeDesc expr, List<ExprNodeDesc> groupByKeys,
+        FastBitSet[] bitSets, int groupingSetPosition) {
+      List<Integer> gbyKeyPos = new ArrayList<Integer>();
+      getGBYKeyPosFromExpr(expr, groupByKeys, gbyKeyPos);
+      // gbyKeysInExpr can be empty, maybe the expr is a boolean constant, let the expr push down
+      for (Integer pos : gbyKeyPos) {
+        for (FastBitSet bitset : bitSets) {
+          int keyPos = bitset.nextClearBit(0);
+          while (keyPos < groupingSetPosition && keyPos != pos) {
+            keyPos = bitset.nextClearBit(keyPos + 1);
+          }
+          // If the gbyKey has not be found in grouping sets, the expr should not be pushed down
+          if (keyPos != pos) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+  }
+
   /**
    * Default processor which just merges its children.
    */
-  public static class DefaultPPD implements NodeProcessor {
+  public static class DefaultPPD implements SemanticNodeProcessor {
 
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
@@ -1045,52 +1140,56 @@ public final class OpProcFactory {
     return decomposed.residualPredicate;
   }
 
-  public static NodeProcessor getFilterProc() {
+  public static SemanticNodeProcessor getFilterProc() {
     return new FilterPPD();
   }
 
-  public static NodeProcessor getFilterSyntheticJoinPredicateProc() {
+  public static SemanticNodeProcessor getFilterSyntheticJoinPredicateProc() {
     return new SimpleFilterPPD();
   }
 
-  public static NodeProcessor getJoinProc() {
+  public static SemanticNodeProcessor getJoinProc() {
     return new JoinPPD();
   }
 
-  public static NodeProcessor getTSProc() {
+  public static SemanticNodeProcessor getTSProc() {
     return new TableScanPPD();
   }
 
-  public static NodeProcessor getDefaultProc() {
+  public static SemanticNodeProcessor getDefaultProc() {
     return new DefaultPPD();
   }
 
-  public static NodeProcessor getPTFProc() {
+  public static SemanticNodeProcessor getPTFProc() {
     return new PTFPPD();
   }
 
-  public static NodeProcessor getSCRProc() {
+  public static SemanticNodeProcessor getSCRProc() {
     return new ScriptPPD();
   }
 
-  public static NodeProcessor getLIMProc() {
+  public static SemanticNodeProcessor getLIMProc() {
     return new ScriptPPD();
   }
 
-  public static NodeProcessor getLVFProc() {
+  public static SemanticNodeProcessor getLVFProc() {
     return new LateralViewForwardPPD();
   }
 
-  public static NodeProcessor getUDTFProc() {
+  public static SemanticNodeProcessor getUDTFProc() {
     return new UDTFPPD();
   }
 
-  public static NodeProcessor getLVJProc() {
+  public static SemanticNodeProcessor getLVJProc() {
     return new JoinerPPD();
   }
 
-  public static NodeProcessor getRSProc() {
+  public static SemanticNodeProcessor getRSProc() {
     return new ReduceSinkPPD();
+  }
+
+  public static SemanticNodeProcessor getGBYProc() {
+    return new GroupByPPD();
   }
 
   private OpProcFactory() {

@@ -39,7 +39,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import javax.security.auth.Subject;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.key.KeyProvider;
@@ -99,6 +99,7 @@ import org.apache.hadoop.tools.DistCp;
 import org.apache.hadoop.tools.DistCpOptions;
 import org.apache.hadoop.tools.DistCpOptions.FileAttribute;
 import org.apache.hadoop.util.Progressable;
+import org.apache.hadoop.util.SuppressFBWarnings;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairSchedulerConfiguration;
 import org.apache.tez.dag.api.TezConfiguration;
@@ -262,9 +263,7 @@ public class Hadoop23Shims extends HadoopShimsSecure {
    */
   @Override
   public void refreshDefaultQueue(Configuration conf, String userName) throws IOException {
-    if (StringUtils.isNotBlank(userName) && isFairScheduler(conf)) {
-      ShimLoader.getSchedulerShims().refreshDefaultQueue(conf, userName);
-    }
+    //no op
   }
 
   private boolean isFairScheduler (Configuration conf) {
@@ -416,6 +415,7 @@ public class Hadoop23Shims extends HadoopShimsSecure {
       conf.setInt(TezRuntimeConfiguration.TEZ_RUNTIME_IO_SORT_MB, 24);
       conf.setInt(TezRuntimeConfiguration.TEZ_RUNTIME_UNORDERED_OUTPUT_BUFFER_SIZE_MB, 10);
       conf.setFloat(TezRuntimeConfiguration.TEZ_RUNTIME_SHUFFLE_FETCH_BUFFER_PERCENT, 0.4f);
+      conf.setInt(TezConfiguration.TEZ_COUNTERS_MAX, 1024);
       conf.set("fs.defaultFS", nameNode);
       conf.set("tez.am.log.level", "DEBUG");
       conf.set(MRJobConfig.MR_AM_STAGING_DIR, "/apps_staging_dir");
@@ -619,7 +619,7 @@ public class Hadoop23Shims extends HadoopShimsSecure {
    * MiniDFSShim.
    *
    */
-  public class MiniDFSShim implements HadoopShims.MiniDFSShim {
+  public static class MiniDFSShim implements HadoopShims.MiniDFSShim {
     private final MiniDFSCluster cluster;
 
     public MiniDFSShim(MiniDFSCluster cluster) {
@@ -644,7 +644,8 @@ public class Hadoop23Shims extends HadoopShimsSecure {
     }
     return hcatShimInstance;
   }
-  private final class HCatHadoopShims23 implements HCatHadoopShims {
+
+  private static final class HCatHadoopShims23 implements HCatHadoopShims {
     @Override
     public TaskID createTaskID() {
       return new TaskID("", 0, TaskType.MAP, 0);
@@ -828,7 +829,7 @@ public class Hadoop23Shims extends HadoopShimsSecure {
     stream.hflush();
   }
 
-  class ProxyFileSystem23 extends ProxyFileSystem {
+  static class ProxyFileSystem23 extends ProxyFileSystem {
     public ProxyFileSystem23(FileSystem fs) {
       super(fs);
     }
@@ -1030,7 +1031,7 @@ public class Hadoop23Shims extends HadoopShimsSecure {
   /**
    * Shim for KerberosName
    */
-  public class KerberosNameShim implements HadoopShimsSecure.KerberosNameShim {
+  public static class KerberosNameShim implements HadoopShimsSecure.KerberosNameShim {
 
     private final KerberosName kerberosName;
 
@@ -1188,6 +1189,7 @@ public class Hadoop23Shims extends HadoopShimsSecure {
 
   private static Boolean hdfsEncryptionSupport;
 
+  @SuppressFBWarnings(value = "LI_LAZY_INIT_STATIC", justification = "All threads set the same value despite data race")
   public static boolean isHdfsEncryptionSupported() {
     if (hdfsEncryptionSupport == null) {
       Method m = null;
@@ -1205,8 +1207,8 @@ public class Hadoop23Shims extends HadoopShimsSecure {
     return hdfsEncryptionSupport;
   }
 
-  public class HdfsEncryptionShim implements HadoopShims.HdfsEncryptionShim {
-    private final String HDFS_SECURITY_DEFAULT_CIPHER = "AES/CTR/NoPadding";
+  public static class HdfsEncryptionShim implements HadoopShims.HdfsEncryptionShim {
+    private static final String HDFS_SECURITY_DEFAULT_CIPHER = "AES/CTR/NoPadding";
 
     /**
      * Gets information about HDFS encryption zones
@@ -1221,11 +1223,9 @@ public class Hadoop23Shims extends HadoopShimsSecure {
     private final Configuration conf;
 
     public HdfsEncryptionShim(URI uri, Configuration conf) throws IOException {
-      DistributedFileSystem dfs = (DistributedFileSystem)FileSystem.get(uri, conf);
-
       this.conf = conf;
-      this.keyProvider = dfs.getClient().getKeyProvider();
       this.hdfsAdmin = new HdfsAdmin(uri, conf);
+      this.keyProvider = this.hdfsAdmin.getKeyProvider();
     }
 
     @Override
@@ -1243,7 +1243,7 @@ public class Hadoop23Shims extends HadoopShimsSecure {
       return (getEncryptionZoneForPath(fullPath) != null);
     }
 
-    private EncryptionZone getEncryptionZoneForPath(Path path) throws IOException {
+    public EncryptionZone getEncryptionZoneForPath(Path path) throws IOException {
       if (path.getFileSystem(conf).exists(path)) {
         return hdfsAdmin.getEncryptionZoneForPath(path);
       } else if (!path.getParent().equals(path)) {
